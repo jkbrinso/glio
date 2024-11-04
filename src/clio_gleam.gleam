@@ -1,15 +1,22 @@
 /// This is the top of the main clio_gleam.gleam file
 import gleam/uri.{type Uri}
 
-import glow_auth/uri/uri_builder
 import glow_auth
 import glow_auth/authorize_uri
+import glow_auth/uri/uri_builder
 
+// Holds unique details concerning your application. 
+//
+// - authorization_uri: In the OAuth2 workflow, this is the url that Clio
+// will send your users back to after they provide their credentials to
+// Clio and authorize your application
+//
+// Note: authorization_uri cannot be localhost. For development purposes, you
+// should use, e.g., 127.0.0.1. If you are using mist, you can use 
+// mist.bind("127.0.0.1") in your handler pipe before starting your server to 
+// do this
 pub type MyApp {
-  MyApp(id: String, 
-    secret: String,
-    authorization_uri: Uri
-    )
+  MyApp(id: String, secret: String, authorization_uri: Uri)
 }
 
 // Generates the Clio url that the user will need to be directed to in order 
