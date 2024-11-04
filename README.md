@@ -1,24 +1,11 @@
 # clio_gleam
 
-[![Package Version](https://img.shields.io/hexpm/v/clio_gleam)](https://hex.pm/packages/clio_gleam)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/clio_gleam/)
+A library for building gleam applications that interact with the API for Clio, a cloud-based law practice management platform
 
-```sh
-gleam add clio_gleam@1
-```
-```gleam
-import clio_gleam
+## Status
 
-pub fn main() {
-  // TODO: An example of the project in use
-}
-```
+I have been building a private app and I am re-writing the Clio interface as a library to share with others. 
 
-Further documentation can be found at <https://hexdocs.pm/clio_gleam>.
+## License 
 
-## Development
-
-```sh
-gleam run   # Run the project
-gleam test  # Run the tests
-```
+Will be released under GPL-3.0 license, but willing to consider other licenses on a case-by-case basis, especially for contributors. 
