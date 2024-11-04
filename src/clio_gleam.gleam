@@ -28,8 +28,9 @@ pub type MyApp {
   MyApp(id: String, secret: String, authorization_uri: Uri)
 }
 
-pub type ClioToken =
-  access_token.AccessToken
+pub type ClioToken = {
+  ClioToken(access_token: String, refresh_token: String, expires_at: Int) 
+}
 
 /// Generates the Clio url that the user will need to be directed to in order 
 /// to log in to Clio and authorize access to your application. This is a pure
@@ -96,6 +97,9 @@ fn get_code_from_req(req: Request(String)) -> Result(String, String) {
 /// Using a given temporary code from clio from the authorization step,
 /// attempts to fetch a more permanent authorization token and refresh token
 /// directly from clio
+///
+/// If successful, the app will need to store the access token, the refresh 
+/// and the expiration time, such as in a database or as a cookie. 
 fn get_token_from_code(
   my_app: MyApp,
   code: String,
@@ -123,8 +127,14 @@ fn decode_token_from_response(
   resp: response.Response(String),
 ) -> Result(access_token.AccessToken, String) {
   case access_token.decode_token_from_response(resp.body) {
-    Ok(token) -> Ok(token)
+    Ok(token) -> case token.refresh_token, token.expires_at {
+      Some(ref_tok), Some(expires_at) -> 
+        ClioToken(token.access_token, ref_tok, expires_at)
+      _, _ -> Error("Received an access token from Clio, but the token received
+        wass missing either a refresh token or an expiration time.")
+    }
     Error(e) -> Error("Unable to decode access token from the response
       received from Clio. More information: " <> string.inspect(e))
   }
 }
+
