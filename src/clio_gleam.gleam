@@ -1,18 +1,24 @@
 //// This is the top of the main clio_gleam.gleam file
 
 import gleam/dict
+import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request.{type Request}
 import gleam/http/response
 import gleam/httpc
+import gleam/int
+import gleam/json
+import gleam/option.{Some}
 import gleam/result
 import gleam/string
 import gleam/uri.{type Uri}
 
 import glow_auth
-import glow_auth/access_token
+import glow_auth/access_token as glow_access_token
 import glow_auth/authorize_uri
 import glow_auth/token_request
 import glow_auth/uri/uri_builder
+
+import app/clio_users
 
 /// Holds unique details concerning your application. 
 ///
@@ -28,8 +34,13 @@ pub type MyApp {
   MyApp(id: String, secret: String, authorization_uri: Uri)
 }
 
-pub type ClioToken = {
-  ClioToken(access_token: String, refresh_token: String, expires_at: Int) 
+pub type ClioToken {
+  ClioToken(
+    access_token: String,
+    refresh_token: String,
+    expires_at: Int,
+    user_id: String,
+  )
 }
 
 /// Generates the Clio url that the user will need to be directed to in order 
@@ -64,7 +75,12 @@ pub fn build_clio_authorization_url(my_app: MyApp) -> String {
 ///
 /// This function uses the code received from Clio when the user visits the
 /// build_clio_authorization() url. It sends that code to the Clio API to 
-/// request a more permanent token from Clio. It then returns that token.
+/// request a more permanent token from Clio. It then returns a ClioToken
+/// representing the token received from Clio. 
+/// 
+/// The app will need to store each of the records in ClioToken somehow, such 
+/// as in cookies or a database, and reconstruct the ClioToken when making api 
+/// requests. 
 ///
 /// Arguments:
 /// - app: your application, as represented in an instance of type MyApp
@@ -75,36 +91,51 @@ pub fn authorize(
   incoming_req: Request(String),
 ) -> Result(ClioToken, String) {
   use code <- result.try(get_code_from_req(incoming_req))
-  get_token_from_code(my_app, code, my_app.authorization_uri)
+  use glow_token <- result.try(fetch_glow_token_using_code(
+    my_app,
+    code,
+    my_app.authorization_uri,
+  ))
+  use user_id <- result.try(get_user_id_from_api(glow_token.access_token))
+  build_clio_token_from_glow_token(glow_token, user_id)
 }
 
-/// Given a Request req, returns the value of the query parameter "code"
-/// included in the request.
-fn get_code_from_req(req: Request(String)) -> Result(String, String) {
-  let code_result = {
-    use queries_list <- result.try(request.get_query(req))
-    let queries_dict = dict.from_list(queries_list)
-    dict.get(queries_dict, "code")
-  }
-  case code_result {
-    Ok(val) -> Ok(val)
-    Error(e) -> Error("The user's request did not contain an authorization 
-      code. This could occur if the user was not re-directed here directly
-      from Clio. More information " <> string.inspect(e))
+fn build_clio_token_from_glow_token(
+  glow_token: glow_access_token.AccessToken,
+  user_id: String,
+) -> Result(ClioToken, String) {
+  case glow_token.refresh_token, glow_token.expires_at {
+    Some(ref_tok), Some(expires_at) ->
+      Ok(ClioToken(
+        access_token: glow_token.access_token,
+        refresh_token: ref_tok,
+        expires_at: expires_at,
+        user_id: user_id,
+      ))
+    refresh_option_received, expiration_option_received ->
+      Error(
+        "Received an access token from Clio, but the token received "
+        <> "was missing a refresh token, an expiration time, or both."
+        <> " | REFRESH TOKEN: "
+        <> string.inspect(refresh_option_received)
+        <> " | EXPIRES AT: "
+        <> string.inspect(expiration_option_received),
+      )
   }
 }
 
 /// Using a given temporary code from clio from the authorization step,
 /// attempts to fetch a more permanent authorization token and refresh token
-/// directly from clio
+/// directly from clio, which will be returned as a ClioToken. The ClioToken
+/// also has a record for the current users Clio user id, for convenience.
 ///
-/// If successful, the app will need to store the access token, the refresh 
-/// and the expiration time, such as in a database or as a cookie. 
-fn get_token_from_code(
+/// If successful, the app will need to store the records in the ClioToken
+/// somehow, such as in 
+fn fetch_glow_token_using_code(
   my_app: MyApp,
   code: String,
   redirect_uri: uri.Uri,
-) -> Result(access_token.AccessToken, String) {
+) -> Result(glow_access_token.AccessToken, String) {
   let assert Ok(clio_uri) = uri.parse("https://app.clio.com")
   let client = glow_auth.Client(my_app.id, my_app.secret, clio_uri)
   let token_uri_appendage = uri_builder.RelativePath("oauth/token")
@@ -117,24 +148,104 @@ fn get_token_from_code(
     )
   case httpc.send(auth_code_req) {
     Ok(resp) -> decode_token_from_response(resp)
-    Error(e) -> Error("Failed to receive a response from Clio when attempting
-      to get authorization token. More information: " <> string.inspect(e))
+    Error(e) ->
+      Error(
+        "Failed to receive a response from Clio when attempting "
+        <> "to get authorization token. More information: "
+        <> string.inspect(e),
+      )
+  }
+}
+
+/// Given a Request req, returns the value of the query parameter "code"
+/// included in the request.
+fn get_code_from_req(req: Request(String)) -> Result(String, String) {
+  let code_result = {
+    use queries_list <- result.try(request.get_query(req))
+    let queries_dict = dict.from_list(queries_list)
+    dict.get(queries_dict, "code")
+  }
+  case code_result {
+    Ok(val) -> Ok(val)
+    Error(e) ->
+      Error(
+        "The user's request did not contain an authorization "
+        <> "code. This could occur if the user was not re-directed here directly "
+        <> "from Clio. More information: "
+        <> string.inspect(e),
+      )
   }
 }
 
 /// Helper function for above
 fn decode_token_from_response(
   resp: response.Response(String),
-) -> Result(access_token.AccessToken, String) {
-  case access_token.decode_token_from_response(resp.body) {
-    Ok(token) -> case token.refresh_token, token.expires_at {
-      Some(ref_tok), Some(expires_at) -> 
-        ClioToken(token.access_token, ref_tok, expires_at)
-      _, _ -> Error("Received an access token from Clio, but the token received
-        wass missing either a refresh token or an expiration time.")
-    }
-    Error(e) -> Error("Unable to decode access token from the response
-      received from Clio. More information: " <> string.inspect(e))
+) -> Result(glow_access_token.AccessToken, String) {
+  case glow_access_token.decode_token_from_response(resp.body) {
+    Ok(token) -> Ok(token)
+    Error(e) ->
+      Error(
+        "Unable to decode access token from the response "
+        <> "received from Clio. More information: "
+        <> string.inspect(e),
+      )
   }
 }
 
+fn get_user_id_from_api(token_str) -> Result(String, String) {
+  // Get the user's clio user id using the api  
+  let assert Ok(api_uri) =
+    uri.parse("https://app.clio.com/api/v4/users/who_am_i.json")
+  let assert Ok(user_id_request) = request.from_uri(api_uri)
+  use user_id_response: response.Response(String) <- result.try(
+    make_request_with_token(token_str, user_id_request),
+  )
+  let body = user_id_response.body
+  use user: clio_users.User <- result.try(case
+    json.decode(body, clio_data_decoder(clio_users.user_decoder()))
+  {
+    Ok(a) -> Ok(a)
+    Error(e) ->
+      Error(
+        "Unable to decode user_id from json received from Clio"
+        <> "More information: "
+        <> string.inspect(e),
+      )
+  })
+  Ok(int.to_string(user.id))
+}
+
+fn make_request_with_token(
+  access_token: String,
+  outgoing_req: request.Request(String),
+) -> Result(response.Response(String), String) {
+  glow_auth.authorization_header(outgoing_req, access_token)
+  |> httpc.send()
+  |> result.map_error(fn(e) {
+    "No response or invalid response received "
+    <> "from Clio when attempting to make api request. More information: "
+    <> string.inspect(e)
+  })
+}
+
+/// Used to decode the clio json "data" field that wraps the data in api calls
+type ClioData(inner_type) {
+  ClioData(data: inner_type)
+}
+
+/// Most of the data that clio returns is wrapped in a "data" field. This
+/// decoder accepts a decoder function as an argument, and wraps a data field
+/// decoder around it. This is to avoid having to implement a separate decoder
+/// for each specific type of api call
+fn clio_data_decoder(
+  inner_decoder: fn(Dynamic) -> Result(inner_type, List(dynamic.DecodeError)),
+) -> fn(Dynamic) -> Result(inner_type, List(DecodeError)) {
+  let outer_decoder =
+    dynamic.decode1(ClioData, dynamic.field("data", inner_decoder))
+  fn(d: Dynamic) {
+    case outer_decoder(d) {
+      Ok(clio_data) -> Ok(clio_data.data)
+      Error(e) -> Error(e)
+    }
+  }
+}
