@@ -1,7 +1,6 @@
 //// This is the top of the main clio_gleam.gleam file
 
 import gleam/dict
-import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request.{type Request}
 import gleam/http/response
 import gleam/httpc
@@ -19,6 +18,7 @@ import glow_auth/token_request
 import glow_auth/uri/uri_builder
 
 import app/clio_users
+import app/internal/api
 
 /// Holds unique details concerning your application. 
 ///
@@ -32,15 +32,6 @@ import app/clio_users
 /// do this
 pub type MyApp {
   MyApp(id: String, secret: String, authorization_uri: Uri)
-}
-
-pub type ClioToken {
-  ClioToken(
-    access_token: String,
-    refresh_token: String,
-    expires_at: Int,
-    user_id: String,
-  )
 }
 
 /// Generates the Clio url that the user will need to be directed to in order 
@@ -89,7 +80,7 @@ pub fn build_clio_authorization_url(my_app: MyApp) -> String {
 pub fn authorize(
   my_app: MyApp,
   incoming_req: Request(String),
-) -> Result(ClioToken, String) {
+) -> Result(api.ClioToken, String) {
   use code <- result.try(get_code_from_req(incoming_req))
   use glow_token <- result.try(fetch_glow_token_using_code(
     my_app,
@@ -103,10 +94,10 @@ pub fn authorize(
 fn build_clio_token_from_glow_token(
   glow_token: glow_access_token.AccessToken,
   user_id: String,
-) -> Result(ClioToken, String) {
+) -> Result(api.ClioToken, String) {
   case glow_token.refresh_token, glow_token.expires_at {
     Some(ref_tok), Some(expires_at) ->
-      Ok(ClioToken(
+      Ok(api.ClioToken(
         access_token: glow_token.access_token,
         refresh_token: ref_tok,
         expires_at: expires_at,
@@ -198,11 +189,11 @@ fn get_user_id_from_api(token_str) -> Result(String, String) {
     uri.parse("https://app.clio.com/api/v4/users/who_am_i.json")
   let assert Ok(user_id_request) = request.from_uri(api_uri)
   use user_id_response: response.Response(String) <- result.try(
-    make_request_with_token(token_str, user_id_request),
+    api.make_request(token_str, user_id_request),
   )
   let body = user_id_response.body
   use user: clio_users.User <- result.try(case
-    json.decode(body, clio_data_decoder(clio_users.user_decoder()))
+    json.decode(body, api.clio_data_decoder(clio_users.user_decoder()))
   {
     Ok(a) -> Ok(a)
     Error(e) ->
@@ -213,39 +204,4 @@ fn get_user_id_from_api(token_str) -> Result(String, String) {
       )
   })
   Ok(int.to_string(user.id))
-}
-
-fn make_request_with_token(
-  access_token: String,
-  outgoing_req: request.Request(String),
-) -> Result(response.Response(String), String) {
-  glow_auth.authorization_header(outgoing_req, access_token)
-  |> httpc.send()
-  |> result.map_error(fn(e) {
-    "No response or invalid response received "
-    <> "from Clio when attempting to make api request. More information: "
-    <> string.inspect(e)
-  })
-}
-
-/// Used to decode the clio json "data" field that wraps the data in api calls
-type ClioData(inner_type) {
-  ClioData(data: inner_type)
-}
-
-/// Most of the data that clio returns is wrapped in a "data" field. This
-/// decoder accepts a decoder function as an argument, and wraps a data field
-/// decoder around it. This is to avoid having to implement a separate decoder
-/// for each specific type of api call
-fn clio_data_decoder(
-  inner_decoder: fn(Dynamic) -> Result(inner_type, List(dynamic.DecodeError)),
-) -> fn(Dynamic) -> Result(inner_type, List(DecodeError)) {
-  let outer_decoder =
-    dynamic.decode1(ClioData, dynamic.field("data", inner_decoder))
-  fn(d: Dynamic) {
-    case outer_decoder(d) {
-      Ok(clio_data) -> Ok(clio_data.data)
-      Error(e) -> Error(e)
-    }
-  }
 }
