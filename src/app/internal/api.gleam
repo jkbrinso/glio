@@ -7,7 +7,6 @@ import gleam/http/request
 import gleam/http/response
 import gleam/httpc
 import gleam/int
-import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -24,6 +23,21 @@ pub type ClioToken {
     expires_at: Int,
     user_id: String,
   )
+}
+
+pub type FetchError {
+  TokenDecodeError(message: String)
+}
+
+/// Add a query parameter to a request string
+pub fn add_query_parameter(
+  outgoing_req: request.Request(String),
+  key: String,
+  value: String,
+) -> request.Request(String) {
+  result.unwrap(request.get_query(outgoing_req), [])
+  |> list.append([#(key, value)])
+  |> fn(q) { request.set_query(outgoing_req, q) }
 }
 
 pub fn make_request(
@@ -60,9 +74,11 @@ fn make_paginated_request_helper(
   use new_data <- result.try(json_decoder(api_resp.body))
   let all_data_so_far = list.flatten([accumulator, new_data])
   case get_next_url(api_resp.body) {
+    // An error state means there is no next page url, which means this is the
+    // last page
     Error(_) -> Ok(all_data_so_far)
     Ok(url) -> {
-      use request_for_next_page <- result.try(url_to_uri(url))
+      use request_for_next_page <- result.try(url_to_request(url))
       make_paginated_request_helper(
         clio_token,
         request_for_next_page,
@@ -81,7 +97,7 @@ fn get_next_url(body) -> Result(String, String) {
   }
 }
 
-fn url_to_uri(url: String) -> Result(request.Request(String), String) {
+fn url_to_request(url: String) -> Result(request.Request(String), String) {
   use a_uri <- result.try(case uri.parse(url) {
     Ok(valid_uri) -> Ok(valid_uri)
     Error(_) -> Error("Unable to parse url: " <> string.inspect(url))
@@ -94,7 +110,7 @@ fn url_to_uri(url: String) -> Result(request.Request(String), String) {
         <> "URI: "
         <> string.inspect(a_uri)
         <> "\n"
-        <> "RESULT ERROR: "
+        <> "ERROR: "
         <> string.inspect(e),
       )
   }
