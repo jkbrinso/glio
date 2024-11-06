@@ -25,9 +25,9 @@ pub type ClioToken {
   )
 }
 
-pub type FetchError {
-  TokenDecodeError(message: String)
-}
+// pub type FetchError {
+//   TokenDecodeError(message: String)
+// }
 
 /// Add a query parameter to a request string
 pub fn add_query_parameter(
@@ -44,13 +44,24 @@ pub fn make_request(
   access_token: String,
   outgoing_req: request.Request(String),
 ) -> Result(response.Response(String), String) {
-  glow_auth.authorization_header(outgoing_req, access_token)
-  |> httpc.send()
-  |> result.map_error(fn(e) {
-    "No response or invalid response received "
-    <> "from Clio when attempting to make api request. More information: "
-    <> string.inspect(e)
-  })
+  let request_with_authorization_header =
+    glow_auth.authorization_header(outgoing_req, access_token)
+  let api_response_result =
+    httpc.send(request_with_authorization_header)
+    |> result.map_error(fn(e) {
+      "Error when attempting to make api request. More information: "
+      <> string.inspect(e)
+    })
+  use api_response <- result.try(api_response_result)
+  case api_response.status {
+    200 -> Ok(api_response)
+    _ ->
+      Error(
+        "Clio returned an error in response to the api request. "
+        <> "More information: "
+        <> string.inspect(api_response),
+      )
+  }
 }
 
 pub fn make_paginated_request(
