@@ -80,7 +80,7 @@ pub fn build_clio_authorization_url(my_app: MyApp) -> String {
 pub fn authorize(
   my_app: MyApp,
   incoming_req: Request(String),
-) -> Result(api.ClioToken, String) {
+) -> Result(String, String) {
   use code <- result.try(get_code_from_req(incoming_req))
   use glow_token <- result.try(fetch_glow_token_using_code(
     my_app,
@@ -88,7 +88,11 @@ pub fn authorize(
     my_app.authorization_uri,
   ))
   use user_id <- result.try(get_user_id_from_api(glow_token.access_token))
-  build_clio_token_from_glow_token(glow_token, user_id)
+  use clio_token <- result.try(build_clio_token_from_glow_token(
+    glow_token,
+    user_id,
+  ))
+  Ok(api.convert_token_to_string(clio_token))
 }
 
 fn build_clio_token_from_glow_token(

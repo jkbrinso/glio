@@ -6,6 +6,8 @@ import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request
 import gleam/http/response
 import gleam/httpc
+import gleam/int
+import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -158,5 +160,45 @@ pub fn clio_data_decoder(
       Ok(clio_data) -> Ok(clio_data.data)
       Error(e) -> Error(e)
     }
+  }
+}
+
+pub fn convert_token_to_string(token: ClioToken) -> String {
+  "CLIO_GLEAM_TOKEN_DATA|"
+  <> token.access_token
+  <> "|"
+  <> token.refresh_token
+  <> "|"
+  <> int.to_string(token.expires_at)
+  <> "|"
+  <> token.user_id
+}
+
+pub fn convert_string_to_token(
+  token_string: String,
+) -> Result(ClioToken, String) {
+  case string.split(token_string, "|") {
+    [
+      "CLIO_GLEAM_TOKEN_DATA",
+      access_token,
+      refresh_token,
+      expires_at_str,
+      user_id,
+    ] ->
+      case int.parse(expires_at_str) {
+        Ok(expires_at) ->
+          Ok(ClioToken(access_token, refresh_token, expires_at, user_id))
+        Error(Nil) ->
+          Error(
+            "Unable to convert expiration time string to an "
+            <> "integer. Token string passed into function: "
+            <> token_string,
+          )
+      }
+    _ ->
+      Error(
+        "Unable to parse string into a ClioToken. String that failed: "
+        <> token_string,
+      )
   }
 }
