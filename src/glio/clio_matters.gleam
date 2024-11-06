@@ -5,7 +5,7 @@ import gleam/result
 import gleam/string
 import gleam/uri
 
-import app/internal/api
+import glio/internal/api
 
 pub type Matter {
   Matter(id: Int, display_number: String, description: String)

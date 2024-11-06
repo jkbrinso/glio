@@ -1,4 +1,5 @@
-//// This is the top of the main clio_gleam.gleam file
+//// A library for interacting with the API of Clio, a law practice management 
+//// platform
 
 import gleam/dict
 import gleam/http/request.{type Request}
@@ -17,8 +18,8 @@ import glow_auth/authorize_uri
 import glow_auth/token_request
 import glow_auth/uri/uri_builder
 
-import app/clio_users
-import app/internal/api
+import glio/clio_users
+import glio/internal/api
 
 /// Holds unique details concerning your application. 
 ///
