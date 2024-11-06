@@ -1,6 +1,6 @@
-# clio_gleam
+# glio
 
-A library for building gleam applications that interact with the API for Clio, a cloud-based law practice management platform
+A library for building Gleam <http://gleam.run> applications that interact with the API for Clio <http://clio.com>, a cloud-based law practice management platform
 
 ## Status/Background
 
