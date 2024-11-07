@@ -5,7 +5,8 @@ import gleam/result
 import gleam/string
 import gleam/uri
 
-import glio/internal/api
+import glio/internal/api_pure
+import glio/internal/api_impure
 
 pub type Matter {
   Matter(id: Int, display_number: String, description: String)
@@ -21,15 +22,15 @@ pub fn matter_decoder() {
 }
 
 pub fn fetch_users_matters(token_data: String) -> Result(List(Matter), String) {
-  use token <- result.try(api.convert_string_to_token(token_data))
+  use token <- result.try(api_pure.convert_string_to_token(token_data))
   let assert Ok(api_uri) = uri.parse("https://app.clio.com/api/v4/matters.json")
   let assert Ok(api_req) = request.from_uri(api_uri)
   let api_request_with_parameters =
     api_req
-    |> api.add_query_parameter("responsible_attorney_id", token.user_id)
-    |> api.add_query_parameter("status", "open,pending")
-    |> api.add_query_parameter("fields", "id,display_number,description")
-  api.make_paginated_request(
+    |> api_pure.add_query_parameter("responsible_attorney_id", token.user_id)
+    |> api_pure.add_query_parameter("status", "open,pending")
+    |> api_pure.add_query_parameter("fields", "id,display_number,description")
+  api_impure.make_paginated_request(
     token,
     api_request_with_parameters,
     decode_matter_json,
@@ -40,7 +41,7 @@ fn decode_matter_json(json_data: String) -> Result(List(Matter), String) {
   case
     json.decode(
       json_data,
-      api.clio_data_decoder(dynamic.list(matter_decoder())),
+      api_pure.clio_data_decoder(dynamic.list(matter_decoder())),
     )
   {
     Ok(matter_data) -> Ok(matter_data)
