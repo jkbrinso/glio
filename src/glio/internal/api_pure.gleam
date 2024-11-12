@@ -28,6 +28,15 @@ pub type ClioToken {
   )
 }
 
+pub type ClioValue {
+  ClioString(String)
+  ClioInt(Int)
+  ClioData(ClioValue)
+  ClioList(List(ClioValue))
+  Empty
+  NotRetrieved
+}
+
 /// Add a query parameter to a request string
 pub fn add_query_parameter(
   outgoing_req: request.Request(String),
@@ -237,4 +246,18 @@ pub fn decode_token_from_response(
         <> string.inspect(e),
       )
   }
+}
+
+pub fn build_api_query(api_request: request.Request(String), 
+  filters: Dict(String, String), 
+  fields_to_return: List(String)) 
+-> request.Request(String) {
+  let filters_as_tuples = dict.to_list(query_parameters)
+  let fields_to_return_as_string = list.join(fields_to_return, ",") 
+  let api_request_with_filters = 
+    list.fold(filters, 
+      api_request, 
+      fn (req, param) -> { add_query_parameter(req, )
+      )
+
 }

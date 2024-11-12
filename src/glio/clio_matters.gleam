@@ -21,6 +21,15 @@ pub fn matter_decoder() {
   )
 }
 
+pub fn fetch_matters_all_pages(token_data: String, query_parameters: Dict(String, String), fields: List(String)) -> Result(List(Dict(String, ClioValue)), String) {
+  use token <- result.try(api_pure.convert_string_to_token(token_data))
+  let assert Ok(api_uri) = uri.parse("https://app.clio.com/api/v4/matters.json")
+  let assert Ok(api_req) = request.from_uri(api_uri)
+  
+}
+
+
+
 pub fn fetch_users_matters(token_data: String) -> Result(List(Matter), String) {
   use token <- result.try(api_pure.convert_string_to_token(token_data))
   let assert Ok(api_uri) = uri.parse("https://app.clio.com/api/v4/matters.json")
