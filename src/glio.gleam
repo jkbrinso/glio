@@ -24,9 +24,9 @@ pub fn build_my_app(
 ) -> Result(MyApp, String) {
   use authorization_redirect_uri <- result.try(result.replace_error(
     uri.parse(my_authorization_redirect_url),
-    "Your authorization redirect url "
-      <> "could not be parsed. Is it a valid url? URL: "
-      <> string.inspect(my_authorization_redirect_url),
+    "Your authorization redirect url could not be parsed. Is it a valid url? "
+    <> " e.g. 'https://my.site.com/authorize' - you submitted: "
+    <> string.inspect(my_authorization_redirect_url),
   ))
   Ok(api_pure.MyApp(
     my_apps_clio_id,
@@ -83,7 +83,7 @@ pub fn build_clio_authorization_url(my_app: MyApp) -> String {
 ///   will have the clio authentication code in it as a parameter
 pub fn fetch_authorization_token(
   my_app: MyApp,
-  incoming_request: Request(String),
+  incoming_request: Request(a),
 ) -> Result(String, String) {
   use code <- result.try(api_pure.get_code_from_req(incoming_request))
   use glow_token: glow_access_token.AccessToken <- result.try(

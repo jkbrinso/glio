@@ -183,7 +183,7 @@ fn decode_pagination(json_data: String) -> Result(ClioPagesUrls, String) {
 
 /// Given a Request req, returns the value of the query parameter "code"
 /// included in the request.
-pub fn get_code_from_req(req: Request(String)) -> Result(String, String) {
+pub fn get_code_from_req(req: Request(a)) -> Result(String, String) {
   let code_result = {
     use queries_list <- result.try(request.get_query(req))
     let queries_dict = dict.from_list(queries_list)
