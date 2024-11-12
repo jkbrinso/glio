@@ -83,7 +83,12 @@ pub fn make_paginated_request(
   api_req_w_params: request.Request(String),
   json_decoder: fn(String) -> Result(List(a), String),
 ) -> Result(List(a), String) {
-  make_paginated_request_tail_optimized(clio_token, api_req_w_params, json_decoder, [])
+  make_paginated_request_tail_optimized(
+    clio_token,
+    api_req_w_params,
+    json_decoder,
+    [],
+  )
 }
 
 fn make_paginated_request_tail_optimized(

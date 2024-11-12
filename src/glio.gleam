@@ -25,8 +25,8 @@ pub fn build_my_app(
   use authorization_redirect_uri <- result.try(result.replace_error(
     uri.parse(my_authorization_redirect_url),
     "Your authorization redirect url could not be parsed. Is it a valid url? "
-    <> " e.g. 'https://my.site.com/authorize' - you submitted: "
-    <> string.inspect(my_authorization_redirect_url),
+      <> " e.g. 'https://my.site.com/authorize' - you submitted: "
+      <> string.inspect(my_authorization_redirect_url),
   ))
   Ok(api_pure.MyApp(
     my_apps_clio_id,
