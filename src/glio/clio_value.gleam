@@ -1,4 +1,4 @@
-
+import tempo
 
 pub type ClioValue(a) {
   ClioSome(a)
@@ -6,4 +6,8 @@ pub type ClioValue(a) {
   ClioValueError(message: String)
 }
 
-
+pub type MatterStatus {
+  Pending
+  Open
+  Closed
+}

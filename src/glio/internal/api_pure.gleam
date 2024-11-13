@@ -28,10 +28,6 @@ pub type ClioToken {
   )
 }
 
-pub type ClioValue(a) {
-  
-}
-
 /// Add a query parameter to a request string
 pub fn add_query_parameter(
   outgoing_req: request.Request(String),

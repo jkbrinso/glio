@@ -1,5 +1,5 @@
 import gleam/dict.{type Dict}
-import gleam/dynamic.{type Dynamic, type DecodeError}
+import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request
 import gleam/json
 import gleam/option.{type Option}
@@ -8,11 +8,12 @@ import gleam/string
 import gleam/uri
 
 // This package is gtempo
-import tempo
+import tempo.{type Date}
+import tempo/date
 
+import glio/clio_value.{type ClioValue}
 import glio/internal/api_impure
 import glio/internal/api_pure
-import glio/clio_value.{type ClioValue, ClioSome, ClioNon, ClioValueError}
 
 const matter_api_url = "https://app.clio.com/api/v4/matters.json"
 
@@ -29,14 +30,15 @@ pub type Matter {
     close_date: ClioValue(tempo.Date),
     matter_stage_id: ClioValue(String),
     originating_attorney_id: ClioValue(String),
-    responsible_attorney_id: ClioValue(String)
+    responsible_attorney_id: ClioValue(String),
   )
 }
 
-const all_matter_fields = ["id", "description", "client_id", "display_number", 
-  "custom_number", "status", "billable", "open_date", "close_date", 
-  "matter_stage{id, name}", "originating_attorney{id, name}", 
-  "responsible_attorney{id, name}"]
+const all_matter_fields = [
+  "id", "description", "client_id", "display_number", "custom_number", "status",
+  "billable", "open_date", "close_date", "matter_stage{id, name}",
+  "originating_attorney{id, name}", "responsible_attorney{id, name}",
+]
 
 pub type MatterField {
   Id
@@ -44,7 +46,7 @@ pub type MatterField {
   ClientId
   DisplayNumber
   CustomNumber
-  Status 
+  Status
   Billable
   OpenDate
   CloseDate
@@ -53,8 +55,13 @@ pub type MatterField {
   ResponsibleAttorneyId
 }
 
-fn matter_field_to_query_string(field: MatterField) 
--> String {
+pub type MatterStatus {
+  Pending
+  Open
+  Closed
+}
+
+fn matter_field_to_query_string(field: MatterField) -> String {
   case field {
     Id -> "id"
     Description -> "description"
@@ -71,26 +78,24 @@ fn matter_field_to_query_string(field: MatterField)
   }
 }
 
-pub type MatterStatus {
-  Pending
-  Open 
-  Closed
-}
-
-pub fn fetch_this_users_open_matters(token_data: String) -> Result(List(Matter), 
-    String) {
+pub fn fetch_this_users_open_matters(
+  token_data: String,
+) -> Result(List(Matter), String) {
   use token <- result.try(api_pure.convert_string_to_token(token_data))
   use api_request <- result.try(
     request.to(matter_api_url)
-    |> result.map_error(fn(_: Nil) { "Unknown error formulating a proper request "
-      <> "to: " <> matter_api_url })
+    |> result.map_error(fn(_: Nil) {
+      "Unknown error formulating a proper request " <> "to: " <> matter_api_url
+    }),
   )
-  let filters = dict.from_list([
-    #("responsible_attorney_id", token.user_id),
-    #("status", "open,pending")])
+  let filters =
+    dict.from_list([
+      #("responsible_attorney_id", token.user_id),
+      #("status", "open,pending"),
+    ])
   let fields_to_return = all_matter_fields
-  let api_request_with_queries = api_pure.build_api_query(api_request, filters, 
-    fields_to_return)
+  let api_request_with_queries =
+    api_pure.build_api_query(api_request, filters, fields_to_return)
   api_impure.fetch_all_pages_from_clio(
     token,
     api_request_with_queries,
@@ -98,8 +103,10 @@ pub fn fetch_this_users_open_matters(token_data: String) -> Result(List(Matter),
   )
 }
 
-fn decode_matter_json(json_data: String, fields: List(String)) 
--> Result(List(Matter), String) {
+fn decode_matter_json(
+  json_data: String,
+  fields: List(String),
+) -> Result(List(Matter), String) {
   case
     json.decode(
       json_data,
@@ -110,8 +117,12 @@ fn decode_matter_json(json_data: String, fields: List(String))
     Error(e) ->
       Error(
         "Unable to decode the json received from Clio for a matter. \n"
-        <> "JSON DATA RECEIVED: " <> string.inspect(json_data) <> " \n"
-        <> "DECODER ERROR MESSAGE: " <> string.inspect(e) <> " \n"
+        <> "JSON DATA RECEIVED: "
+        <> string.inspect(json_data)
+        <> " \n"
+        <> "DECODER ERROR MESSAGE: "
+        <> string.inspect(e)
+        <> " \n",
       )
   }
 }
@@ -120,32 +131,22 @@ fn matter_decoder() -> fn(Dynamic) -> Result(Matter, List(DecodeError)) {
   todo
 }
 
-fn matter_field_decoder(field: MatterField) 
--> fn(Dynamic) -> Result(ClioValue, List(DecodeError)) {
-  case field {
-    Id -> fn(d) { to_clio_value(dynamic.string
-    Description -> dynamic.string
-    ClientId -> dynamic.string
-    DisplayNumber -> dynamic.optional(dynamic.string) 
-    CustomNumber -> dynamic.optional(dynamic.string) 
-    Status -> status_decoder  
-    Billable -> dynamic.bool 
-    OpenDate -> dynamic.optional(tempo.from_dynamic_string)  
-    CloseDate -> dynamic.optional(tempo.from_dynamic_string) 
-    MatterStageId -> stage_decoder  
-    OriginatingAttorneyId -> dynamic.optional(user_decoder)  
-    ResponsibleAttorneyId -> dynamic.optional(user_decoder)  
-  }
-}
-
-fn user_decoder() {
+fn clio_value_decoder(
+  inner_decoder: fn(Dynamic) -> Result(a, List(DecodeError)),
+) -> fn(Dynamic) -> Result(ClioValue(a), List(DecodeError)) {
   todo
 }
 
-fn status_decoder() {
+fn user_decoder(d: Dynamic) -> Result(ClioValue(String), List(DecodeError)) {
   todo
 }
 
-fn stage_decoder() {
+fn status_decoder(
+  d: Dynamic,
+) -> Result(ClioValue(MatterStatus), List(DecodeError)) {
+  todo
+}
 
+fn stage_decoder(d: Dynamic) -> Result(ClioValue(String), List(DecodeError)) {
+  todo
 }
