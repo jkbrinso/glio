@@ -1,6 +1,6 @@
-import gleam/uri
-import gleam/http/request
 import gleam/dict
+import gleam/http/request
+import gleam/uri
 
 import gleeunit
 import gleeunit/should
@@ -44,15 +44,19 @@ pub fn token_string_conversion_test() {
 pub fn build_api_query_test() {
   let assert Ok(uri) = uri.parse("http://wwww.test.com/endpoint")
   let assert Ok(api_request) = request.from_uri(uri)
-  let filters = dict.from_list([
-    #("responsible_attorney_id", "1234"),
-    #("status", "open,pending")])
+  let filters =
+    dict.from_list([
+      #("responsible_attorney_id", "1234"),
+      #("status", "open,pending"),
+    ])
   let fields = ["id", "display_number", "description"]
   let req = api_pure.build_api_query(api_request, filters, fields)
   request.get_query(req)
-  |> should.equal(Ok([
-    #("responsible_attorney_id", "1234"),
-    #("status", "open,pending"),
-    #("fields", "id,display_number,description"),
-    ]))
+  |> should.equal(
+    Ok([
+      #("responsible_attorney_id", "1234"),
+      #("status", "open,pending"),
+      #("fields", "id,display_number,description"),
+    ]),
+  )
 }

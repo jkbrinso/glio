@@ -2,14 +2,13 @@ import gleam/dict.{type Dict}
 import gleam/dynamic
 import gleam/http/request
 import gleam/json
+import gleam/option.{type Option}
 import gleam/result
 import gleam/string
 import gleam/uri
-import gleam/option.{type Option}
 
 import glio/internal/api_impure
 import glio/internal/api_pure
-
 
 pub type MatterData {
   Id(Int)
@@ -18,11 +17,7 @@ pub type MatterData {
 }
 
 pub type Matter {
-  Matter(
-    id: Int,
-    description: String,
-    display_number: String,
-  )
+  Matter(id: Int, description: String, display_number: String)
 }
 
 pub fn matter_decoder() {
