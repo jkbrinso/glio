@@ -78,7 +78,7 @@ pub fn make_api_request(
   }
 }
 
-pub fn make_paginated_request(
+pub fn fetch_all_pages_from_clio(
   clio_token: ClioToken,
   api_req_w_params: request.Request(String),
   json_decoder: fn(String) -> Result(List(a), String),
