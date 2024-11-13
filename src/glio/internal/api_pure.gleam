@@ -1,4 +1,4 @@
-import gleam/dict
+import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request.{type Request}
 import gleam/http/response
@@ -29,11 +29,12 @@ pub type ClioToken {
 }
 
 pub type ClioValue {
-  ClioString(String)
-  ClioInt(Int)
-  ClioData(ClioValue)
-  ClioList(List(ClioValue))
-  Empty
+  ClioBool
+  ClioDate
+  ClioInt
+  ClioString
+  ClioOption(ClioValue)
+  ClioList(ClioValue)
   NotRetrieved
 }
 
@@ -248,16 +249,22 @@ pub fn decode_token_from_response(
   }
 }
 
-pub fn build_api_query(api_request: request.Request(String), 
-  filters: Dict(String, String), 
-  fields_to_return: List(String)) 
--> request.Request(String) {
-  let filters_as_tuples = dict.to_list(query_parameters)
-  let fields_to_return_as_string = list.join(fields_to_return, ",") 
-  let api_request_with_filters = 
-    list.fold(filters, 
-      api_request, 
-      fn (req, param) -> { add_query_parameter(req, )
-      )
-
+pub fn build_api_query(
+  api_request: request.Request(String),
+  filters: Dict(String, String),
+  fields_to_return: List(String),
+) -> request.Request(String) {
+  let filters_as_tuples = dict.to_list(filters)
+  let fields_to_return_as_string = string.join(fields_to_return, ",")
+  let api_request_with_filters =
+    list.fold(filters_as_tuples, api_request, fn(req, param) {
+      add_query_parameter(req, param.0, param.1)
+    })
+  let api_request_with_filters_and_fields =
+    add_query_parameter(
+      api_request_with_filters,
+      "fields",
+      fields_to_return_as_string,
+    )
+  api_request_with_filters_and_fields
 }
