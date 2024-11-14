@@ -1,6 +1,7 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request
+import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -12,28 +13,10 @@ import gleam/uri
 import tempo.{type Date}
 import tempo/date
 
-import glio/clio_value.{type ClioValue}
 import glio/internal/api_impure
 import glio/internal/api_pure
 
 const matter_api_url = "https://app.clio.com/api/v4/matters.json"
-
-pub type Matter {
-  Matter(
-    id: ClioValue(String),
-    description: ClioValue(String),
-    client_id: ClioValue(String),
-    display_number: ClioValue(String),
-    custom_number: ClioValue(String),
-    status: ClioValue(MatterStatus),
-    billable: ClioValue(Bool),
-    open_date: ClioValue(tempo.Date),
-    close_date: ClioValue(tempo.Date),
-    matter_stage_id: ClioValue(String),
-    originating_attorney_id: ClioValue(String),
-    responsible_attorney_id: ClioValue(String),
-  )
-}
 
 pub type MatterField {
   Id
@@ -56,7 +39,16 @@ const all_matter_fields = [
   ResponsibleAttorneyId,
 ]
 
-pub type MatterStatus {
+pub type MatterValue {
+  MatterString(String)
+  MatterInt(Int)
+  MatterDate(tempo.Date)
+  MatterStatus(StatusOfMatter)
+  MatterOption(Option(MatterValue))
+  MatterList(List(MatterValue))
+}
+
+pub type StatusOfMatter {
   Pending
   Open
   Closed
@@ -81,7 +73,7 @@ fn matter_field_to_query_string(field: MatterField) -> String {
 
 pub fn fetch_this_users_open_matters(
   token_data: String,
-) -> Result(List(Matter), String) {
+) -> Result(List(Dict(MatterField, MatterValue)), String) {
   use token <- result.try(api_pure.convert_string_to_token(token_data))
   use api_request <- result.try(
     request.to(matter_api_url)
@@ -111,70 +103,82 @@ pub fn fetch_this_users_open_matters(
 fn decode_matter_json(
   json_data: String,
   fields: List(MatterField),
-) -> Result(List(Matter), String) {
-  use matter_data <- result.try(
-    result.map_error(
-      json.decode(
-        json_data,
-        api_pure.clio_data_decoder(dynamic.list(matter_decoder(_, fields))),
-      ),
-      fn(e) {
-        "Unable to decode the json received from Clio for a matter. \n"
-        <> "JSON DATA RECEIVED: "
-        <> string.inspect(json_data)
-        <> " \n"
-        <> "DECODER ERROR MESSAGE: "
-        <> string.inspect(e)
-        <> " \n"
-      },
+) -> Result(List(Dict(MatterField, MatterValue)), String) {
+  result.map_error(
+    json.decode(
+      json_data,
+      api_pure.clio_data_decoder(dynamic.list(matter_decoder(_, fields))),
     ),
+    fn(e) {
+      "Unable to decode the json received from Clio for a matter. \n"
+      <> "JSON DATA RECEIVED: "
+      <> string.inspect(json_data)
+      <> " \n"
+      <> "DECODER ERRORS: "
+      <> string.inspect(e)
+      <> " \n"
+    },
   )
-  todo
 }
 
 fn matter_decoder(
-  dynamic_value,
+  dynamic_value: Dynamic,
   fields: List(MatterField),
 ) -> Result(Dict(MatterField, MatterValue), List(DecodeError)) {
-  todo
-}
-
-type MatterValue {
-  MatterString(String)
-  MatterInt(Int)
-  MatterDate(tempo.Date)
-  MatterStat(MatterStatus)
-  MatterOption(Option(MatterValue))
-  MatterList(List(MatterValue))
-}
-
-fn get_decoder_by_field(
-  field: MatterField,
-) -> fn(Dynamic) -> Result(MatterValue, List(dynamic.DecodeError)) {
-  case field {
-    Id -> matter_value_decoder(_, dynamic.int)
-    Description -> matter_value_decoder(_, dynamic.string)
-    _ -> fn(_) { Ok(MatterOption(None)) }
+  case fields {
+    [] -> Ok(dict.new())
+    [head_field, ..tail] -> {
+      let decoded_head = decode_by_field(dynamic_value, head_field)
+      let decoded_tail = matter_decoder(dynamic_value, tail)
+      case decoded_head, decoded_tail {
+        Ok(head_value), Ok(tail_dict) ->
+          Ok(dict.insert(tail_dict, head_field, head_value))
+        Error(head_errors), Error(tail_errors) ->
+          Error(list.flatten([head_errors, tail_errors]))
+        Ok(_), Error(tail_errors) -> Error(tail_errors)
+        Error(head_errors), Ok(_) -> Error(head_errors)
+      }
+    }
   }
 }
 
-fn matter_value_decoder(
+fn decode_by_field(
   dynamic_value: Dynamic,
-  expect inner_decoder: fn(Dynamic) -> Result(a, List(DecodeError)),
+  field: MatterField,
+) -> Result(MatterValue, List(dynamic.DecodeError)) {
+  case field {
+    Id -> int_decoder(dynamic_value)
+    Description -> string_decoder(dynamic_value)
+    _ -> todo
+  }
+}
+
+pub fn int_decoder(
+  dynamic_value: Dynamic,
 ) -> Result(MatterValue, List(DecodeError)) {
+  case dynamic.int(dynamic_value) {
+    Ok(an_int) -> Ok(MatterInt(an_int))
+    Error(e) -> Error(e)
+  }
+}
+
+pub fn string_decoder(
+  dynamic_value: Dynamic,
+) -> Result(MatterValue, List(DecodeError)) {
+  case dynamic.string(dynamic_value) {
+    Ok(str) -> Ok(MatterString(str))
+    Error(e) -> Error(e)
+  }
+}
+
+fn user_decoder(d: Dynamic) -> Result(MatterValue, List(DecodeError)) {
   todo
 }
 
-fn user_decoder(d: Dynamic) -> Result(ClioValue(String), List(DecodeError)) {
+fn status_decoder(d: Dynamic) -> Result(MatterValue, List(DecodeError)) {
   todo
 }
 
-fn status_decoder(
-  d: Dynamic,
-) -> Result(ClioValue(MatterStatus), List(DecodeError)) {
-  todo
-}
-
-fn stage_decoder(d: Dynamic) -> Result(ClioValue(String), List(DecodeError)) {
+fn stage_decoder(d: Dynamic) -> Result(MatterValue, List(DecodeError)) {
   todo
 }
