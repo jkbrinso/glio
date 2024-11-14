@@ -14,8 +14,6 @@ import glow_auth/uri/uri_builder
 import glio/internal/api_impure
 import glio/internal/api_pure.{type MyApp}
 
-
-
 /// Returns a MyApp record. This record is a convenient way to store your 
 /// application's Clio API credentials and will need to be passed to the api
 /// to obtain authorization tokens from Clio.  

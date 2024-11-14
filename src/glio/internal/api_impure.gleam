@@ -1,3 +1,4 @@
+import gleam/dynamic
 import gleam/http/request
 import gleam/http/response
 import gleam/httpc
@@ -31,6 +32,18 @@ pub fn fetch_glow_token_using_temporary_code(
   }
 }
 
+type User {
+  User(id: Int, name: String)
+}
+
+fn user_decoder() {
+  dynamic.decode2(
+    User,
+    dynamic.field("id", dynamic.int),
+    dynamic.field("name", dynamic.string),
+  )
+}
+
 pub fn get_user_id_from_api(token_str) -> Result(String, String) {
   // Get the user's clio user id using the api  
   let assert Ok(api_uri) =
@@ -40,8 +53,8 @@ pub fn get_user_id_from_api(token_str) -> Result(String, String) {
     make_api_request(token_str, user_id_request),
   )
   let body = user_id_response.body
-  use user: clio_users.User <- result.try(case
-    json.decode(body, api_pure.clio_data_decoder(clio_users.user_decoder()))
+  use user: User <- result.try(case
+    json.decode(body, api_pure.clio_data_decoder(user_decoder()))
   {
     Ok(a) -> Ok(a)
     Error(e) ->
