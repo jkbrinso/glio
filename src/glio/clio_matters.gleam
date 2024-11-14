@@ -2,6 +2,7 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request
 import gleam/json
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
@@ -95,7 +96,11 @@ pub fn fetch_this_users_open_matters(
     ])
   let fields_to_return = all_matter_fields
   let api_request_with_queries =
-    api_pure.build_api_query(api_request, filters, fields_to_return)
+    api_pure.build_api_query(
+      api_request,
+      filters,
+      list.map(fields_to_return, matter_field_to_query_string),
+    )
   api_impure.fetch_all_pages_from_clio(
     token,
     api_request_with_queries,
