@@ -1,19 +1,16 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request
-import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import gleam/uri
 
 // This package is gtempo
-import tempo.{type Date}
+import tempo
 import tempo/date
 
-import glio/clio_users
 import glio/internal/api_impure
 import glio/internal/api_pure
 
@@ -68,8 +65,8 @@ fn matter_field_to_query_string(field: MatterField) -> String {
     OpenDate -> "open_date"
     CloseDate -> "close_date"
     MatterStageId -> "matter_stage{id,name}"
-    OriginatingAttorney -> "originating_attorney.{id,name}"
-    ResponsibleAttorney -> "responsible_attorney.{id,name}"
+    OriginatingAttorney -> "originating_attorney{id,name}"
+    ResponsibleAttorney -> "responsible_attorney{id,name}"
   }
 }
 
@@ -179,8 +176,7 @@ fn decode_by_field(
         _,
         string_decoder,
       ))
-    Status ->
-      field_decoder(dynamic_value, Status, option_decoder(_, status_decoder))
+    Status -> field_decoder(dynamic_value, Status, status_decoder)
     Billable ->
       field_decoder(dynamic_value, Billable, option_decoder(_, bool_decoder))
     OpenDate ->
@@ -240,43 +236,95 @@ fn bool_decoder(
   }
 }
 
-fn user_decoder(d: Dynamic) -> Result(MatterValue, List(DecodeError)) {
-  todo
+fn user_decoder(
+  dynamic_value: Dynamic,
+) -> Result(MatterValue, List(DecodeError)) {
+  let inner_decoder =
+    dynamic.decode2(
+      User,
+      dynamic.field("id", dynamic.int),
+      dynamic.field("name", dynamic.optional(dynamic.string)),
+    )
+  case inner_decoder(dynamic_value) {
+    Ok(user) -> Ok(MatterUser(user))
+    Error(e) -> Error(e)
+  }
 }
 
-fn status_decoder(d: Dynamic) -> Result(MatterValue, List(DecodeError)) {
-  todo
+fn status_decoder(
+  dynamic_value: Dynamic,
+) -> Result(MatterValue, List(DecodeError)) {
+  case dynamic.string(dynamic_value) {
+    Ok("Open") -> Ok(MatterStatus(Open))
+    Ok("Closed") -> Ok(MatterStatus(Closed))
+    Ok("Pending") -> Ok(MatterStatus(Pending))
+    Ok(other) ->
+      Error([
+        dynamic.DecodeError(
+          "String of either \"Open\", \"Closed\", or \"Pending\"",
+          string.inspect(other),
+          [],
+        ),
+      ])
+    Error(e) -> Error(e)
+  }
 }
 
-fn stage_decoder(d: Dynamic) -> Result(MatterValue, List(DecodeError)) {
-  todo
+fn stage_decoder(
+  dynamic_value: Dynamic,
+) -> Result(MatterValue, List(DecodeError)) {
+  let decoder = dynamic.field("id", dynamic.int)
+  case decoder(dynamic_value) {
+    Ok(an_int) -> Ok(MatterInt(an_int))
+    Error(e) -> Error(e)
+  }
 }
 
-fn date_decoder(d: Dynamic) -> Result(MatterValue, List(DecodeError)) {
-  todo
+fn date_decoder(
+  dynamic_value: Dynamic,
+) -> Result(MatterValue, List(DecodeError)) {
+  case date.from_dynamic_string(dynamic_value) {
+    Ok(a_date) -> Ok(MatterDate(a_date))
+    Error(e) -> Error(e)
+  }
 }
 
-fn client_decoder(d: Dynamic) -> Result(MatterValue, List(DecodeError)) {
-  todo
+fn client_decoder(
+  dynamic_value: Dynamic,
+) -> Result(MatterValue, List(DecodeError)) {
+  let decoder = dynamic.field("id", dynamic.int)
+  case decoder(dynamic_value) {
+    Ok(an_int) -> Ok(MatterInt(an_int))
+    Error(e) -> Error(e)
+  }
 }
 
 fn option_decoder(
-  d: Dynamic,
+  dynamic_value: Dynamic,
   inner_decoder: fn(Dynamic) -> Result(MatterValue, List(DecodeError)),
 ) -> Result(MatterValue, List(DecodeError)) {
-  todo
+  let inner_decoder = dynamic.optional(inner_decoder)
+  case inner_decoder(dynamic_value) {
+    Ok(Some(value)) -> Ok(MatterOption(Some(value)))
+    Ok(None) -> Ok(MatterOption(None))
+    Error(e) -> Error(e)
+  }
 }
 
 fn list_decoder(
-  d: Dynamic,
+  dynamic_value: Dynamic,
   inner_decoder: fn(Dynamic) -> Result(MatterValue, List(DecodeError)),
 ) -> Result(MatterValue, List(DecodeError)) {
-  todo
+  let decoder = dynamic.list(inner_decoder)
+  case decoder(dynamic_value) {
+    Ok(a_list) -> Ok(MatterList(a_list))
+    Error(e) -> Error(e)
+  }
 }
 
 @deprecated("Delete User type in matters module")
 pub type User {
-  User(id: Int, name: String)
+  User(id: Int, name: Option(String))
 }
 //@deprecated("Delete user_decoder in matters module")
 //pub fn user_decoder() {
