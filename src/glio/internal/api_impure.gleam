@@ -12,7 +12,6 @@ import gleam/uri
 import glow_auth
 import glow_auth/access_token as glow_access_token
 
-import glio/clio_users
 import glio/internal/api_pure.{type ClioToken, type MyApp}
 
 pub fn fetch_glow_token_using_temporary_code(
