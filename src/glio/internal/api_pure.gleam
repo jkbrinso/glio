@@ -103,7 +103,7 @@ pub fn convert_string_to_token(
       }
     _ ->
       Error(
-        "Unable to parse string into a ClioToken. String that failed: "
+        "Unable to parse string into a valid ClioToken. String that failed: "
         <> token_string,
       )
   }
@@ -241,13 +241,12 @@ pub fn decode_token_from_response(
 
 pub fn build_api_query(
   api_request: request.Request(String),
-  filters: Dict(String, String),
+  filters: List(#(String, String)),
   fields_to_return: List(String),
 ) -> request.Request(String) {
-  let filters_as_tuples = dict.to_list(filters)
   let fields_to_return_as_string = string.join(fields_to_return, ",")
   let api_request_with_filters =
-    list.fold(filters_as_tuples, api_request, fn(req, param) {
+    list.fold(filters, api_request, fn(req, param) {
       add_query_parameter(req, param.0, param.1)
     })
   let api_request_with_filters_and_fields =
