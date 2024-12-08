@@ -61,7 +61,7 @@ pub fn clio_data_decoder(
 ) -> fn(Dynamic) -> Result(inner_type, List(DecodeError)) {
   let outer_decoder =
     dynamic.decode1(ClioData, dynamic.field("data", inner_decoder))
-  fn(d: Dynamic) {
+  fn(d: Dynamic) {   
     case outer_decoder(d) {
       Ok(clio_data) -> Ok(clio_data.data)
       Error(e) -> Error(e)
