@@ -3,11 +3,11 @@ import gleam/http/request
 import gleam/http/response
 import gleam/httpc
 import gleam/int
-import gleam/json
 import gleam/list
 import gleam/result
 import gleam/string
 import gleam/uri
+import gleam/json
 
 import glow_auth
 import glow_auth/access_token as glow_access_token

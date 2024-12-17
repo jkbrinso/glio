@@ -1,11 +1,11 @@
 //// A library for interacting with the API of Clio, a law practice management 
 //// platform
 
+import gleam/dict.{type Dict}
 import gleam/http/request.{type Request}
 import gleam/result
 import gleam/string
 import gleam/uri
-import gleam/json
 
 import glow_auth
 import glow_auth/access_token as glow_access_token
@@ -102,21 +102,22 @@ pub fn fetch_authorization_token(
 
 pub fn fetch_clio_data_one_page(
   stored_token: String,
-  clio_api_url: String, 
+  clio_api_url: String,
   filters: Dict(String, String),
   fields_to_return: List(String),
-  json_decoder: fn(String) -> Result(List(a), String)) 
--> Result(List(a), String) {
+  json_decoder: fn(String) -> Result(List(a), String),
+) -> Result(List(a), String) {
   use token <- result.try(api_pure.convert_string_to_token(stored_token))
-  use base_api_request <- result.try(api.pure.url_to_request(clio_api_url))
-  use api_request_with_query <- result.try(api_pure.build_api_query(
-    base_api_request,
-    filters,
-    field_to_return
-  )) 
-  use api_response <- result.try(make_api_request(
+  use base_api_request <- result.try(api_pure.url_to_request(clio_api_url))
+  let api_request_with_query =
+    api_pure.build_api_query(
+      base_api_request,
+      dict.to_list(filters),
+      fields_to_return,
+    )
+  use api_response <- result.try(api_impure.make_api_request(
     token.access_token,
-    api_request_with_query))
-
-  todo
+    api_request_with_query,
+  ))
+  json_decoder(api_response.body)
 }

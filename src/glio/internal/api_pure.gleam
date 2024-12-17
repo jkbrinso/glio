@@ -1,4 +1,3 @@
-import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request.{type Request}
 import gleam/http/response
@@ -9,6 +8,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleam/uri.{type Uri}
+import gleam/dict
 
 import glow_auth
 import glow_auth/access_token as glow_access_token
