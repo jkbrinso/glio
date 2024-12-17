@@ -1,3 +1,4 @@
+import gleam/dict
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request.{type Request}
 import gleam/http/response
@@ -8,7 +9,6 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleam/uri.{type Uri}
-import gleam/dict
 
 import glow_auth
 import glow_auth/access_token as glow_access_token
@@ -43,6 +43,14 @@ pub fn get_next_url(response_body: String) -> Result(String, String) {
   use pagination <- result.try(decode_pagination(response_body))
   case pagination.next {
     None -> Error("No next page url received from Clio.")
+    Some(url) -> Ok(url)
+  }
+}
+
+pub fn get_previous_url(response_body: String) -> Result(String, String) {
+  use pagination <- result.try(decode_pagination(response_body))
+  case pagination.previous {
+    None -> Error("No previous page url received from Clio.")
     Some(url) -> Ok(url)
   }
 }
@@ -169,7 +177,7 @@ fn pages_urls_decoder() -> fn(Dynamic) ->
   )
 }
 
-fn decode_pagination(json_data: String) -> Result(ClioPagesUrls, String) {
+pub fn decode_pagination(json_data: String) -> Result(ClioPagesUrls, String) {
   case json.decode(json_data, meta_decoder()) {
     Ok(clio_meta) -> Ok(clio_meta.paging.urls)
     Error(e) ->

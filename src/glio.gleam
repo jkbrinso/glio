@@ -3,6 +3,7 @@
 
 import gleam/dict.{type Dict}
 import gleam/http/request.{type Request}
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleam/uri
@@ -13,7 +14,7 @@ import glow_auth/authorize_uri
 import glow_auth/uri/uri_builder
 
 import glio/internal/api_impure
-import glio/internal/api_pure.{type MyApp}
+import glio/internal/api_pure.{type ClioPagesUrls, type MyApp}
 
 /// Returns a MyApp record. This record is a convenient way to store your 
 /// application's Clio API credentials and will need to be passed to the api
@@ -100,7 +101,97 @@ pub fn fetch_authorization_token(
   Ok(api_pure.convert_token_to_string(clio_token))
 }
 
-pub fn fetch_clio_data_one_page(
+/// Gets one page of data from clio, with next and previous urls. Useful if
+/// your want to use a json decoder that does not return 
+/// Result(List(a), String) or if you want to handle subsequent previous/next
+/// page requests in a more sophisticated way than fetch 
+///
+/// Returns a tuple of the form:
+///    #(your json_decoder return value, previous_url, next_url)
+///
+/// Otherwise, use fetch_yielder or fetch_all_pages
+pub fn fetch_one_previous_next(
+  stored_token: String,
+  clio_api_url: String,
+  filters: Dict(String, String),
+  json_decoder: fn(String) -> a,
+  fields_to_return: List(String),
+) -> Result(#(a, ClioPagesUrls), String) {
+  use token <- result.try(api_pure.convert_string_to_token(stored_token))
+  use base_api_request <- result.try(api_pure.url_to_request(clio_api_url))
+  let api_request_with_query =
+    api_pure.build_api_query(
+      base_api_request,
+      dict.to_list(filters),
+      fields_to_return,
+    )
+  use api_response <- result.try(api_impure.make_api_request(
+    token.access_token,
+    api_request_with_query,
+  ))
+  use pagination <- result.try(api_pure.decode_pagination(api_response.body))
+  Ok(#(json_decoder(api_response.body), pagination))
+}
+
+pub opaque type ClioYielder(a) {
+  ClioYielder(
+    data: List(a),
+    previous: Option(fn() -> Result(ClioYielder(a), String)),
+    next: Option(fn() -> Result(ClioYielder(a), String)),
+  )
+}
+
+pub fn fetch_one_page(
+  stored_token: String,
+  clio_api_url: String,
+  filters: Dict(String, String),
+  json_decoder: fn(String) -> Result(List(a), String),
+  fields_to_return: List(String),
+) -> Result(ClioYielder(a), String) {
+  use token <- result.try(api_pure.convert_string_to_token(stored_token))
+  use base_api_request <- result.try(api_pure.url_to_request(clio_api_url))
+  let api_request_with_query =
+    api_pure.build_api_query(
+      base_api_request,
+      dict.to_list(filters),
+      fields_to_return,
+    )
+  use api_response <- result.try(api_impure.make_api_request(
+    token.access_token,
+    api_request_with_query,
+  ))
+  use this_page_of_data <- result.try(json_decoder(api_response.body))
+  use pagination <- result.try(api_pure.decode_pagination(api_response.body))
+  let next_func = case pagination.next {
+    Some(next_url) ->
+      Some(fn() {
+        fetch_one_page(
+          stored_token,
+          next_url,
+          filters,
+          json_decoder,
+          fields_to_return,
+        )
+      })
+    None -> None
+  }
+  let prev_func = case pagination.next {
+    Some(prev_url) ->
+      Some(fn() {
+        fetch_one_page(
+          stored_token,
+          prev_url,
+          filters,
+          json_decoder,
+          fields_to_return,
+        )
+      })
+    None -> None
+  }
+  Ok(ClioYielder(this_page_of_data, prev_func, next_func))
+}
+
+pub fn fetch_all_pages(
   stored_token: String,
   clio_api_url: String,
   filters: Dict(String, String),
@@ -115,9 +206,9 @@ pub fn fetch_clio_data_one_page(
       dict.to_list(filters),
       fields_to_return,
     )
-  use api_response <- result.try(api_impure.make_api_request(
-    token.access_token,
+  api_impure.fetch_all_pages_from_clio(
+    token,
     api_request_with_query,
-  ))
-  json_decoder(api_response.body)
+    json_decoder,
+  )
 }

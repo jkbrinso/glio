@@ -3,11 +3,11 @@ import gleam/http/request
 import gleam/http/response
 import gleam/httpc
 import gleam/int
+import gleam/json
 import gleam/list
 import gleam/result
 import gleam/string
 import gleam/uri
-import gleam/json
 
 import glow_auth
 import glow_auth/access_token as glow_access_token
@@ -95,7 +95,7 @@ pub fn fetch_all_pages_from_clio(
   api_req_w_params: request.Request(String),
   json_decoder: fn(String) -> Result(List(a), String),
 ) -> Result(List(a), String) {
-  make_paginated_request_tail_optimized(
+  make_recursive_paginated_request(
     clio_token,
     api_req_w_params,
     json_decoder,
@@ -103,7 +103,7 @@ pub fn fetch_all_pages_from_clio(
   )
 }
 
-fn make_paginated_request_tail_optimized(
+fn make_recursive_paginated_request(
   clio_token: ClioToken,
   api_req_w_params: request.Request(String),
   json_decoder: fn(String) -> Result(List(a), String),
@@ -121,7 +121,7 @@ fn make_paginated_request_tail_optimized(
     Error(_) -> Ok(all_data_so_far)
     Ok(url) -> {
       use request_for_next_page <- result.try(api_pure.url_to_request(url))
-      make_paginated_request_tail_optimized(
+      make_recursive_paginated_request(
         clio_token,
         request_for_next_page,
         json_decoder,
