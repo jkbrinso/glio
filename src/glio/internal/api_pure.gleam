@@ -1,4 +1,4 @@
-import gleam/dict.{type Dict}
+import gleam/dict
 import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request.{type Request}
 import gleam/http/response
@@ -43,6 +43,14 @@ pub fn get_next_url(response_body: String) -> Result(String, String) {
   use pagination <- result.try(decode_pagination(response_body))
   case pagination.next {
     None -> Error("No next page url received from Clio.")
+    Some(url) -> Ok(url)
+  }
+}
+
+pub fn get_previous_url(response_body: String) -> Result(String, String) {
+  use pagination <- result.try(decode_pagination(response_body))
+  case pagination.previous {
+    None -> Error("No previous page url received from Clio.")
     Some(url) -> Ok(url)
   }
 }
@@ -103,7 +111,7 @@ pub fn convert_string_to_token(
       }
     _ ->
       Error(
-        "Unable to parse string into a ClioToken. String that failed: "
+        "Unable to parse string into a valid ClioToken. String that failed: "
         <> token_string,
       )
   }
@@ -169,7 +177,7 @@ fn pages_urls_decoder() -> fn(Dynamic) ->
   )
 }
 
-fn decode_pagination(json_data: String) -> Result(ClioPagesUrls, String) {
+pub fn decode_pagination(json_data: String) -> Result(ClioPagesUrls, String) {
   case json.decode(json_data, meta_decoder()) {
     Ok(clio_meta) -> Ok(clio_meta.paging.urls)
     Error(e) ->
@@ -241,13 +249,12 @@ pub fn decode_token_from_response(
 
 pub fn build_api_query(
   api_request: request.Request(String),
-  filters: Dict(String, String),
+  filters: List(#(String, String)),
   fields_to_return: List(String),
 ) -> request.Request(String) {
-  let filters_as_tuples = dict.to_list(filters)
   let fields_to_return_as_string = string.join(fields_to_return, ",")
   let api_request_with_filters =
-    list.fold(filters_as_tuples, api_request, fn(req, param) {
+    list.fold(filters, api_request, fn(req, param) {
       add_query_parameter(req, param.0, param.1)
     })
   let api_request_with_filters_and_fields =
