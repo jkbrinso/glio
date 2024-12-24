@@ -22,6 +22,14 @@ pub type ClioToken =
 pub type MyApp =
   api_pure.MyApp
 
+pub type ClioYielder(a) {
+  ClioYielder(
+    data: List(a),
+    prev: Option(fn() -> Result(ClioYielder(a), String)),
+    next: Option(fn() -> Result(ClioYielder(a), String)),
+  )
+}
+
 /// Returns a MyApp record. This record is a convenient way to store your 
 /// application's Clio API credentials and will need to be passed to the api
 /// to obtain authorization tokens from Clio.  
