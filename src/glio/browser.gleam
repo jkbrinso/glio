@@ -22,8 +22,10 @@ pub fn retrieve_token(req: request.Request(a)) -> Result(ClioToken, String) {
   api_pure.convert_string_to_token(token_str)
 }
 
-pub fn set_token_cookie(resp: response.Response(a), token: String) 
--> response.Response(a) {
+pub fn set_token_cookie(
+  resp: response.Response(a),
+  token: String,
+) -> response.Response(a) {
   let cookie_attributes =
     cookie.Attributes(
       max_age: Some(2_592_000),

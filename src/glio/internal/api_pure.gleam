@@ -28,6 +28,12 @@ pub type ClioToken {
   )
 }
 
+pub type ApiResponse(a) {
+  Success(res: a)
+  SuccessWithNewToken(res: a, new_token: ClioToken)
+  Failure(String)
+}
+
 /// Add a query parameter to a request string
 pub fn add_query_parameter(
   outgoing_req: request.Request(String),

@@ -7,14 +7,14 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleam/uri
-
+import glio/internal/api_impure
+import glio/internal/api_pure.{
+  type ApiResponse, type ClioPagesUrls, Failure, Success, SuccessWithNewToken,
+}
 import glow_auth
 import glow_auth/access_token as glow_access_token
 import glow_auth/authorize_uri
 import glow_auth/uri/uri_builder
-
-import glio/internal/api_impure
-import glio/internal/api_pure.{type ClioPagesUrls}
 
 pub type ClioToken =
   api_pure.ClioToken
@@ -105,14 +105,24 @@ pub fn fetch_authorization_token(
   use glow_token: glow_access_token.AccessToken <- result.try(
     api_impure.fetch_glow_token_using_temporary_code(my_app, code),
   )
-  use user_id <- result.try(api_impure.get_user_id_from_api(
-    glow_token.access_token,
-  ))
-  use clio_token <- result.try(api_pure.build_clio_token_from_glow_token(
-    glow_token,
-    user_id,
-  ))
-  Ok(api_pure.convert_token_to_string(clio_token))
+  let assert Ok(temp_token) =
+    api_pure.build_clio_token_from_glow_token(glow_token, "0")
+  case api_impure.get_user_id_from_api(temp_token) {
+    Success(user_id) -> {
+      use clio_token <- result.try(api_pure.build_clio_token_from_glow_token(
+        glow_token,
+        user_id,
+      ))
+      Ok(api_pure.convert_token_to_string(clio_token))
+    }
+    Failure(message) ->
+      Error("fetch_authorization_token() failed -> " <> message)
+    _ ->
+      Error(
+        "fetch_authorization_token() should not get to this branch
+      because it is an initial authorization and can't be expired yet.",
+      )
+  }
 }
 
 /// Gets one page of data from clio, with next and previous urls. Useful if
@@ -128,22 +138,38 @@ pub fn fetch_one_previous_next(
   token: ClioToken,
   clio_api_url: String,
   filters: Dict(String, String),
-  json_decoder: fn(String) -> a,
+  json_decoder: fn(String) -> Result(List(a), String),
   fields_to_return: List(String),
-) -> Result(#(a, ClioPagesUrls), String) {
-  use base_api_request <- result.try(api_pure.url_to_request(clio_api_url))
-  let api_request_with_query =
-    api_pure.build_api_query(
-      base_api_request,
-      dict.to_list(filters),
-      fields_to_return,
-    )
-  use api_response <- result.try(api_impure.make_api_request(
-    token.access_token,
-    api_request_with_query,
-  ))
-  use pagination <- result.try(api_pure.decode_pagination(api_response.body))
-  Ok(#(json_decoder(api_response.body), pagination))
+) -> ApiResponse(#(List(a), ClioPagesUrls)) {
+  case api_pure.url_to_request(clio_api_url) {
+    Ok(base_api_request) -> {
+      let api_request_with_query =
+        api_pure.build_api_query(
+          base_api_request,
+          dict.to_list(filters),
+          fields_to_return,
+        )
+
+      case api_impure.make_api_request(token, api_request_with_query) {
+        Success(api_response) -> {
+          case api_pure.decode_pagination(api_response.body) {
+            Ok(pagination) -> {
+              case json_decoder(api_response.body) {
+                Ok(decoded_data) -> Success(#(decoded_data, pagination))
+                Error(e) -> Failure("Decode error -> " <> string.inspect(e))
+              }
+            }
+            Error(e) -> Failure("Unable to decode pagination -> " 
+              <> string.inspect(e))
+          }
+        }
+        SuccessWithNewToken(apsi_response, new_token) -> todo
+        Failure(message) -> todo
+      }
+    }
+    Error(e) ->
+      Failure("Error converting url to request -> " <> string.inspect(e))
+  }
 }
 
 pub fn fetch_one_page(
@@ -161,7 +187,7 @@ pub fn fetch_one_page(
       fields_to_return,
     )
   use api_response <- result.try(api_impure.make_api_request(
-    token.access_token,
+    token,
     api_request_with_query,
   ))
   use this_page_of_data <- result.try(json_decoder(api_response.body))
