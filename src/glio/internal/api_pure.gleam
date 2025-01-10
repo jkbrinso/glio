@@ -9,7 +9,6 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleam/uri.{type Uri}
-
 import glow_auth
 import glow_auth/access_token as glow_access_token
 import glow_auth/token_request
@@ -29,9 +28,8 @@ pub type ClioToken {
 }
 
 pub type ApiResponse(a) {
-  Success(res: a)
-  SuccessWithNewToken(res: a, new_token: ClioToken)
-  Failure(String)
+  TokenNotRenewed(res: a)
+  TokenRenewed(res: a, new_token: ClioToken)
 }
 
 /// Add a query parameter to a request string
@@ -45,11 +43,11 @@ pub fn add_query_parameter(
   |> fn(q) { request.set_query(outgoing_req, q) }
 }
 
-pub fn get_next_url(response_body: String) -> Result(String, String) {
+pub fn get_next_url(response_body: String) -> Result(Option(String), String) {
   use pagination <- result.try(decode_pagination(response_body))
   case pagination.next {
-    None -> Error("No next page url received from Clio.")
-    Some(url) -> Ok(url)
+    None -> Ok(None)
+    Some(url) -> Ok(Some(url))
   }
 }
 
