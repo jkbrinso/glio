@@ -10,11 +10,15 @@ import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import gleam/uri
-import glio/internal/api_pure.{
-  type ApiResponse, type ClioToken, type MyApp, TokenNotRenewed, TokenRenewed,
+import glio.{
+  type ApiResponse, type ClioToken, type MyApp, ClioToken, TokenNotRenewed,
+  TokenRenewed,
 }
+import glio/internal/api_pure
 import glow_auth
 import glow_auth/access_token as glow_access_token
+import glow_auth/token_request
+import glow_auth/uri/uri_builder
 
 pub fn fetch_glow_token_using_temporary_code(
   my_app: MyApp,
@@ -45,13 +49,16 @@ fn user_decoder() {
   )
 }
 
-pub fn get_user_id_from_api(token_str) -> Result(ApiResponse(String), String) {
+pub fn get_user_id_from_api(
+  my_app,
+  token_str,
+) -> Result(ApiResponse(String), String) {
   // Get the user's clio user id using the api  
   let assert Ok(api_uri) =
     uri.parse("https://app.clio.com/api/v4/users/who_am_i.json")
   let assert Ok(user_id_request) = request.from_uri(api_uri)
   let decode_body = json.decode(_, api_pure.clio_data_decoder(user_decoder()))
-  case make_api_request(token_str, user_id_request) {
+  case make_api_request(my_app, token_str, user_id_request) {
     Ok(TokenNotRenewed(user_id_response)) -> {
       case decode_body(user_id_response.body) {
         Ok(user) -> Ok(TokenNotRenewed(int.to_string(user.id)))
@@ -92,7 +99,7 @@ pub fn make_api_request(
     // token is about to expire or has expired, renew it
     t if t < 60 -> {
       use new_token <- refresh_token_then(token, my_app)
-      case make_api_request(new_token, outgoing_req) {
+      case make_api_request(my_app, new_token, outgoing_req) {
         Ok(TokenNotRenewed(res)) -> Ok(TokenRenewed(res, new_token))
 
         Ok(TokenRenewed(_, _)) ->
@@ -142,14 +149,18 @@ fn refresh_token_then(
 ) -> Result(a, String) {
   let assert Ok(clio_uri) = uri.parse("https://app.clio.com/oauth/token")
   let client = glow_auth.Client(my_app.id, my_app.secret, clio_uri)
-  let full_uri = glow_auth.
-  let req = token_request.refresh(client, clio_uri, token.refresh_token)
+  let req =
+    token_request.refresh(
+      client,
+      uri_builder.FullUri(clio_uri),
+      token.refresh_token,
+    )
   let res = case httpc.send(req) {
     Ok(resp) -> api_pure.decode_token_from_response(resp)
     Error(e) ->
       Error(
         "Failed to receive a response from Clio when attempting "
-        <> "to get authorization token. More information: "
+        <> "to renew authorization token. More information: "
         <> string.inspect(e),
       )
   }
@@ -158,18 +169,20 @@ fn refresh_token_then(
       use new_clio_token <- result.try(
         api_pure.build_clio_token_from_glow_token(glow_token, token.user_id),
       )
-      next(token)
+      next(new_clio_token)
     }
     Error(e) -> Error(e)
   }
 }
 
 pub fn fetch_all_pages_from_clio(
+  my_app: MyApp,
   clio_token: ClioToken,
   api_req_w_params: request.Request(String),
   one_item_decoder: Decoder(a),
 ) -> Result(ApiResponse(List(a)), String) {
   make_recursive_paginated_request(
+    my_app,
     clio_token,
     api_req_w_params,
     one_item_decoder,
@@ -178,17 +191,19 @@ pub fn fetch_all_pages_from_clio(
 }
 
 fn make_recursive_paginated_request(
+  my_app: MyApp,
   clio_token: ClioToken,
   api_req_w_params: request.Request(String),
   json_decoder: Decoder(a),
   accumulator: ApiResponse(List(a)),
 ) -> Result(ApiResponse(List(a)), String) {
-  case make_api_request(clio_token, api_req_w_params) {
+  case make_api_request(my_app, clio_token, api_req_w_params) {
     Ok(TokenNotRenewed(api_resp)) ->
-      parse_response(api_resp, json_decoder, accumulator, clio_token)
+      parse_response(my_app, api_resp, json_decoder, accumulator, clio_token)
 
     Ok(TokenRenewed(api_resp, new_token)) ->
       parse_response(
+        my_app,
         api_resp,
         json_decoder,
         TokenRenewed(accumulator.res, new_token),
@@ -200,6 +215,7 @@ fn make_recursive_paginated_request(
 }
 
 fn parse_response(
+  my_app: MyApp,
   api_resp: response.Response(String),
   one_item_decoder: Decoder(a),
   accumulator: ApiResponse(List(a)),
@@ -223,6 +239,7 @@ fn parse_response(
           case api_pure.url_to_request(url) {
             Ok(request_for_next_page) ->
               make_recursive_paginated_request(
+                my_app,
                 clio_token,
                 request_for_next_page,
                 one_item_decoder,

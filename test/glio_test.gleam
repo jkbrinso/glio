@@ -5,6 +5,7 @@ import gleeunit
 import gleeunit/should
 
 import glio
+import glio/api
 import glio/internal/api_pure
 
 pub fn main() {
@@ -14,8 +15,8 @@ pub fn main() {
 pub fn build_clio_authorization_url_test() {
   let assert Ok(authorization_uri) =
     uri.parse("https://www.myapp.com/authorize")
-  let my_app = api_pure.MyApp("MY_ID", "MY_SECRET", authorization_uri)
-  glio.build_clio_authorization_url(my_app)
+  let my_app = glio.MyApp("MY_ID", "MY_SECRET", authorization_uri)
+  api.build_clio_authorization_url(my_app)
   |> should.equal(
     "https://app.clio.com/oauth/authorize?response_type=code&client_id=MY_ID&redirect_uri=https%3A%2F%2Fwww.myapp.com%2Fauthorize",
   )
@@ -23,12 +24,7 @@ pub fn build_clio_authorization_url_test() {
 
 pub fn token_string_conversion_test() {
   let token =
-    api_pure.ClioToken(
-      "Access token",
-      "Refresh token",
-      3_141_592_654,
-      "1234567890",
-    )
+    glio.ClioToken("Access token", "Refresh token", 3_141_592_654, "1234567890")
   let token_string = api_pure.convert_token_to_string(token)
 
   token_string

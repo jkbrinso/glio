@@ -8,29 +8,12 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import gleam/uri.{type Uri}
+import gleam/uri
+import glio.{type ClioToken, type MyApp, ClioToken}
 import glow_auth
 import glow_auth/access_token as glow_access_token
 import glow_auth/token_request
 import glow_auth/uri/uri_builder
-
-pub type MyApp {
-  MyApp(id: String, secret: String, authorization_redirect_uri: Uri)
-}
-
-pub type ClioToken {
-  ClioToken(
-    access_token: String,
-    refresh_token: String,
-    expires_at: Int,
-    user_id: String,
-  )
-}
-
-pub type ApiResponse(a) {
-  TokenNotRenewed(res: a)
-  TokenRenewed(res: a, new_token: ClioToken)
-}
 
 /// Add a query parameter to a request string
 pub fn add_query_parameter(

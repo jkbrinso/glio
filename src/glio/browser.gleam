@@ -1,5 +1,3 @@
-import glio/internal/api_pure.{type ClioToken}
-
 import gleam/dict
 import gleam/http/cookie
 import gleam/http/request
@@ -7,6 +5,8 @@ import gleam/http/response
 import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
+import glio.{type ClioToken}
+import glio/internal/api_pure
 
 pub fn retrieve_token(req: request.Request(a)) -> Result(ClioToken, String) {
   use token_str <- result.try(
@@ -24,7 +24,7 @@ pub fn retrieve_token(req: request.Request(a)) -> Result(ClioToken, String) {
 
 pub fn set_token_cookie(
   resp: response.Response(a),
-  token: String,
+  token: ClioToken,
 ) -> response.Response(a) {
   let cookie_attributes =
     cookie.Attributes(
@@ -35,5 +35,10 @@ pub fn set_token_cookie(
       http_only: True,
       same_site: Some(cookie.Strict),
     )
-  response.set_cookie(resp, "api_token", token, cookie_attributes)
+  response.set_cookie(
+    resp,
+    "api_token",
+    api_pure.convert_token_to_string(token),
+    cookie_attributes,
+  )
 }
