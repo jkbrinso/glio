@@ -19,6 +19,7 @@ import glow_auth
 import glow_auth/access_token as glow_access_token
 import glow_auth/token_request
 import glow_auth/uri/uri_builder
+import gleam/io
 
 pub fn fetch_glow_token_using_temporary_code(
   my_app: MyApp,
@@ -147,6 +148,9 @@ fn refresh_token_then(
   my_app: MyApp,
   next: fn(ClioToken) -> Result(a, String),
 ) -> Result(a, String) {
+  io.println("glio/api_impure.refresh_token_then() called.")
+  io.println("TOKEN: " <> string.inspect(token))
+  io.println("MY_APP: " <> string.inspect(my_app))
   let assert Ok(clio_uri) = uri.parse("https://app.clio.com/oauth/token")
   let client = glow_auth.Client(my_app.id, my_app.secret, clio_uri)
   let req =
