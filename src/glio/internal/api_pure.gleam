@@ -3,6 +3,7 @@ import gleam/dynamic.{type DecodeError, type Dynamic}
 import gleam/http/request.{type Request}
 import gleam/http/response
 import gleam/int
+import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -211,10 +212,13 @@ pub fn build_clio_token_from_glow_token(
     refresh_option_received, expiration_option_received ->
       Error(
         "The oauth token was missing a refresh token, an expiration time, or "
-        <> "both. "
-        <> "\n REFRESH TOKEN: "
+        <> "both. | GLOW_TOKEN: "
+        <> string.inspect(glow_token)
+        <> " | USER_ID: "
+        <> user_id
+        <> " | REFRESH TOKEN: "
         <> string.inspect(refresh_option_received)
-        <> "\n | EXPIRES AT: "
+        <> " | EXPIRES AT: "
         <> string.inspect(expiration_option_received),
       )
   }
@@ -223,6 +227,8 @@ pub fn build_clio_token_from_glow_token(
 pub fn decode_token_from_response(
   resp: response.Response(String),
 ) -> Result(glow_access_token.AccessToken, String) {
+  io.println("RESPONSE FROM CLIO:")
+  io.debug(resp)
   case glow_access_token.decode_token_from_response(resp.body) {
     Ok(token) -> Ok(token)
     Error(e) ->
