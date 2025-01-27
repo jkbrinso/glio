@@ -3,6 +3,7 @@ import gleam/dynamic/decode.{type Decoder}
 import gleam/http/request.{type Request}
 import gleam/option.{None, Some}
 import gleam/result
+import gleam/io
 import gleam/string
 import gleam/uri
 import glio.{
@@ -89,6 +90,8 @@ pub fn fetch_authorization_token(
   )
   let assert Ok(temp_token) =
     api_pure.build_clio_token_from_glow_token(glow_token, "0")
+  io.println("God a temp token to get id with:")
+  io.debug(temp_token)
   case api_impure.get_user_id_from_api(my_app, temp_token) {
     Ok(TokenNotRenewed(user_id)) -> {
       use clio_token <- result.try(api_pure.build_clio_token_from_glow_token(

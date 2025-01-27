@@ -227,8 +227,6 @@ pub fn build_clio_token_from_glow_token(
 pub fn decode_token_from_response(
   resp: response.Response(String),
 ) -> Result(glow_access_token.AccessToken, String) {
-  io.println("RESPONSE FROM CLIO:")
-  io.debug(resp)
   case glow_access_token.decode_token_from_response(resp.body) {
     Ok(token) -> Ok(token)
     Error(e) ->

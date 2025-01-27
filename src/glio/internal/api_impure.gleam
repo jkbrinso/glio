@@ -173,6 +173,7 @@ fn refresh_token_then(
       use new_clio_token <- result.try(
         api_pure.build_clio_token_from_glow_token(glow_token, token.user_id),
       )
+      let new_clio_token = ClioToken(..new_clio_token, refresh_token: token.refresh_token)
       next(new_clio_token)
     }
     Error(e) -> Error(e)
