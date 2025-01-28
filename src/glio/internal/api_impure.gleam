@@ -75,7 +75,8 @@ pub fn get_user_id_from_api(
     }
     Ok(TokenRenewed(user_id_response, new_token)) -> {
       case decode_body(user_id_response.body) {
-        Ok(user) -> Ok(TokenRenewed(int.to_string(user.id), new_token))
+        Ok(user) -> Ok(TokenRenewed(
+          int.to_string(user.id), new_token))
         Error(e) ->
           Error(
             "api_impure.get_user_id_from_api() unable to decode "
@@ -96,7 +97,7 @@ pub fn make_api_request(
   token: ClioToken,
   outgoing_req: request.Request(String),
 ) -> Result(ApiResponse(response.Response(String)), String) {
-  case glow_access_token.time_now() - token.expires_at {
+  case token.expires_at - glow_access_token.time_now() {
     // token is about to expire or has expired, renew it
     t if t < 60 -> {
       use new_token <- refresh_token_then(token, my_app)

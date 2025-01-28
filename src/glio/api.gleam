@@ -90,15 +90,13 @@ pub fn fetch_authorization_token(
   )
   let assert Ok(temp_token) =
     api_pure.build_clio_token_from_glow_token(glow_token, "0")
-  io.println("God a temp token to get id with:")
-  io.debug(temp_token)
   case api_impure.get_user_id_from_api(my_app, temp_token) {
     Ok(TokenNotRenewed(user_id)) -> {
       use clio_token <- result.try(api_pure.build_clio_token_from_glow_token(
         glow_token,
         user_id,
       ))
-      Ok(TokenNotRenewed(api_pure.convert_token_to_string(clio_token)))
+      Ok(TokenRenewed(api_pure.convert_token_to_string(clio_token), clio_token))
     }
     Ok(TokenRenewed(_user_id, _new_token)) ->
       Error(
