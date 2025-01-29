@@ -1,4 +1,4 @@
-import gleam/dynamic
+import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode.{type Decoder}
 import gleam/http/request
 import gleam/http/response
@@ -227,7 +227,7 @@ fn parse_response(
   accumulator: ApiResponse(List(a)),
   clio_token: ClioToken,
 ) -> Result(ApiResponse(List(a)), String) {
-  case run_decoder(dynamic.from(api_resp.body), one_item_decoder) {
+  case json.decode(api_resp.body, run_decoder(_, one_item_decoder)) {
     Error(e) ->
       Error(
         "api_impure.parse_response(): Errors parsing response. "
@@ -260,12 +260,21 @@ fn parse_response(
 }
 
 fn run_decoder(
-  dyn: dynamic.Dynamic,
+  dyn: Dynamic,
   one_item_decoder: Decoder(a),
-) -> Result(List(a), List(decode.DecodeError)) {
+) -> Result(List(a), List(dynamic.DecodeError)) {
   let decoder =
     decode.field("data", decode.list(one_item_decoder), decode.success(_))
   decode.run(dyn, decoder)
+  |> result.map_error(map_decode_errors(_))
+}
+
+fn map_decode_errors(e: List(decode.DecodeError)) -> List(dynamic.DecodeError) {
+  list.map(e, map_decode_error)
+}
+
+fn map_decode_error(e: decode.DecodeError) -> dynamic.DecodeError {
+  dynamic.DecodeError(e.expected, e.found, e.path)
 }
 
 fn accumulate_api_response(
