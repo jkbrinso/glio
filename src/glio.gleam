@@ -1,8 +1,8 @@
 //// A library for interacting with the API of Clio, a law practice management 
 //// platform
 
-import gleam/uri.{type Uri}
 import gleam/option.{type Option}
+import gleam/uri.{type Uri}
 
 pub type MyApp {
   MyApp(id: String, secret: String, authorization_redirect_uri: Uri)
@@ -29,5 +29,3 @@ pub type ClioYielder(a) {
     next: Option(fn() -> Result(ClioYielder(a), String)),
   )
 }
-
-

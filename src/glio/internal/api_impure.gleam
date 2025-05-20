@@ -1,10 +1,12 @@
+import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode.{type Decoder}
 import gleam/http/request
 import gleam/http/response
 import gleam/httpc
 import gleam/int
-import gleam/json
+import gleam/io
+import gleam/json.{type Json}
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -19,7 +21,6 @@ import glow_auth
 import glow_auth/access_token as glow_access_token
 import glow_auth/token_request
 import glow_auth/uri/uri_builder
-import gleam/io
 
 pub fn fetch_glow_token_using_temporary_code(
   my_app: MyApp,
@@ -75,8 +76,7 @@ pub fn get_user_id_from_api(
     }
     Ok(TokenRenewed(user_id_response, new_token)) -> {
       case decode_body(user_id_response.body) {
-        Ok(user) -> Ok(TokenRenewed(
-          int.to_string(user.id), new_token))
+        Ok(user) -> Ok(TokenRenewed(int.to_string(user.id), new_token))
         Error(e) ->
           Error(
             "api_impure.get_user_id_from_api() unable to decode "
@@ -174,7 +174,8 @@ fn refresh_token_then(
       use new_clio_token <- result.try(
         api_pure.build_clio_token_from_glow_token(glow_token, token.user_id),
       )
-      let new_clio_token = ClioToken(..new_clio_token, refresh_token: token.refresh_token)
+      let new_clio_token =
+        ClioToken(..new_clio_token, refresh_token: token.refresh_token)
       next(new_clio_token)
     }
     Error(e) -> Error(e)
@@ -196,6 +197,19 @@ pub fn fetch_all_pages_from_clio(
   )
 }
 
+pub fn fetch_all_pages_from_clio_json(
+  my_app: MyApp,
+  clio_token: ClioToken,
+  api_req_w_params: request.Request(String),
+) -> Result(ApiResponse(List(String)), String) {
+  make_recursive_paginated_request_json(
+    my_app,
+    clio_token,
+    api_req_w_params,
+    TokenNotRenewed([]),
+  )
+}
+
 fn make_recursive_paginated_request(
   my_app: MyApp,
   clio_token: ClioToken,
@@ -212,6 +226,35 @@ fn make_recursive_paginated_request(
         my_app,
         api_resp,
         json_decoder,
+        TokenRenewed(accumulator.res, new_token),
+        new_token,
+      )
+
+    Error(message) -> Error(message)
+  }
+}
+
+fn make_recursive_paginated_request_json(
+  my_app: MyApp,
+  clio_token: ClioToken,
+  api_req_w_params: request.Request(String),
+  accumulator: ApiResponse(List(String)),
+) -> Result(ApiResponse(List(String)), String) {
+  case make_api_request(my_app, clio_token, api_req_w_params) {
+    Ok(TokenNotRenewed(api_resp)) ->
+      parse_response(
+        my_app,
+        api_resp,
+        decode.string,
+        accumulator,
+        clio_token,
+      )
+
+    Ok(TokenRenewed(api_resp, new_token)) ->
+      parse_response(
+        my_app,
+        api_resp,
+        decode.string,
         TokenRenewed(accumulator.res, new_token),
         new_token,
       )
@@ -264,9 +307,9 @@ fn run_decoder(
   one_item_decoder: Decoder(a),
 ) -> Result(List(a), List(dynamic.DecodeError)) {
   let decoder =
-    decode.field("data", decode.list(one_item_decoder), decode.success(_))
+    decode.field("data", decode.list(one_item_decoder), decode.success)
   decode.run(dyn, decoder)
-  |> result.map_error(map_decode_errors(_))
+  |> result.map_error(map_decode_errors)
 }
 
 fn map_decode_errors(e: List(decode.DecodeError)) -> List(dynamic.DecodeError) {

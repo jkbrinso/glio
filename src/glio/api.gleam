@@ -1,9 +1,11 @@
 import gleam/dict.{type Dict}
+import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode.{type Decoder}
 import gleam/http/request.{type Request}
+import gleam/io
+import gleam/json.{type Json}
 import gleam/option.{None, Some}
 import gleam/result
-import gleam/io
 import gleam/string
 import gleam/uri
 import glio.{
@@ -138,7 +140,7 @@ pub fn fetch_one_previous_next(
       case api_response_result {
         Ok(api_resp) -> {
           let constructor = case api_resp {
-            TokenNotRenewed(_) -> TokenNotRenewed(_)
+            TokenNotRenewed(_) -> TokenNotRenewed
             TokenRenewed(_, new_token) -> TokenRenewed(_, new_token)
           }
           case api_pure.decode_pagination(api_resp.res.body) {
