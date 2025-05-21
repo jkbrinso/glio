@@ -201,7 +201,7 @@ pub fn fetch_all_pages_from_clio_json(
   my_app: MyApp,
   clio_token: ClioToken,
   api_req_w_params: request.Request(String),
-) -> Result(ApiResponse(List(String)), String) {
+) -> Result(ApiResponse(List(String), String) {
   make_recursive_paginated_request_json(
     my_app,
     clio_token,
