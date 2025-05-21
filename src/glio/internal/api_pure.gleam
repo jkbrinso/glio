@@ -241,9 +241,8 @@ pub fn decode_token_from_response(
 pub fn build_api_query(
   api_request: request.Request(String),
   filters: List(#(String, String)),
-  fields_to_return: List(String),
+  fields_to_return: String,
 ) -> request.Request(String) {
-  let fields_to_return_as_string = string.join(fields_to_return, ",")
   let api_request_with_filters =
     list.fold(filters, api_request, fn(req, param) {
       add_query_parameter(req, param.0, param.1)
@@ -252,7 +251,7 @@ pub fn build_api_query(
     add_query_parameter(
       api_request_with_filters,
       "fields",
-      fields_to_return_as_string,
+      fields_to_return,
     )
   api_request_with_filters_and_fields
 }

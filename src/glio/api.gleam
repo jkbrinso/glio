@@ -125,7 +125,7 @@ pub fn fetch_one_previous_next(
   clio_api_url: String,
   filters: Dict(String, String),
   json_decoder: fn(String) -> Result(List(a), String),
-  fields_to_return: List(String),
+  fields_to_return: String,
 ) -> Result(ApiResponse(#(List(a), ClioPagesUrls)), String) {
   case api_pure.url_to_request(clio_api_url) {
     Ok(base_api_request) -> {
@@ -168,7 +168,7 @@ pub fn fetch_one_page(
   clio_api_url: String,
   filters: Dict(String, String),
   json_decoder: fn(String) -> Result(List(a), String),
-  fields_to_return: List(String),
+  fields_to_return: String,
 ) -> Result(ClioYielder(a), String) {
   use base_api_request <- result.try(api_pure.url_to_request(clio_api_url))
   let api_request_with_query =
@@ -224,7 +224,7 @@ pub fn fetch_all_pages(
   token: ClioToken,
   clio_api_url: String,
   filters: Dict(String, String),
-  fields_to_return: List(String),
+  fields_to_return: String,
   json_decoder: Decoder(a),
 ) -> Result(ApiResponse(List(a)), String) {
   use base_api_request <- result.try(api_pure.url_to_request(clio_api_url))
