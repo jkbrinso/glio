@@ -197,18 +197,6 @@ pub fn fetch_all_pages_from_clio(
   )
 }
 
-pub fn fetch_all_pages_from_clio_json(
-  my_app: MyApp,
-  clio_token: ClioToken,
-  api_req_w_params: request.Request(String),
-) -> Result(ApiResponse(List(Dynamic)), String) {
-  make_recursive_paginated_request_json(
-    my_app,
-    clio_token,
-    api_req_w_params,
-    TokenNotRenewed([]),
-  )
-}
 
 fn make_recursive_paginated_request(
   my_app: MyApp,
@@ -218,43 +206,17 @@ fn make_recursive_paginated_request(
   accumulator: ApiResponse(List(a)),
 ) -> Result(ApiResponse(List(a)), String) {
   case make_api_request(my_app, clio_token, api_req_w_params) {
-    Ok(TokenNotRenewed(api_resp)) ->
+    Ok(TokenNotRenewed(api_resp)) -> {
+      echo "GOT A PAGE FROM CLIO:"
+      echo api_resp
       parse_clio_response(my_app, api_resp, json_decoder, accumulator, clio_token)
+    }
 
     Ok(TokenRenewed(api_resp, new_token)) ->
       parse_clio_response(
         my_app,
         api_resp,
         json_decoder,
-        TokenRenewed(accumulator.res, new_token),
-        new_token,
-      )
-
-    Error(message) -> Error(message)
-  }
-}
-
-fn make_recursive_paginated_request_json(
-  my_app: MyApp,
-  clio_token: ClioToken,
-  api_req_w_params: request.Request(String),
-  accumulator: ApiResponse(List(Dynamic)),
-) -> Result(ApiResponse(List(Dynamic)), String) {
-  case make_api_request(my_app, clio_token, api_req_w_params) {
-    Ok(TokenNotRenewed(api_resp)) ->
-      parse_clio_response(
-        my_app,
-        api_resp,
-        decode.dynamic,
-        accumulator,
-        clio_token,
-      )
-
-    Ok(TokenRenewed(api_resp, new_token)) ->
-      parse_clio_response(
-        my_app,
-        api_resp,
-        decode.dynamic,
         TokenRenewed(accumulator.res, new_token),
         new_token,
       )

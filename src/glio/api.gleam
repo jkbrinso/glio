@@ -18,6 +18,7 @@ import glow_auth
 import glow_auth/access_token as glow_access_token
 import glow_auth/authorize_uri
 import glow_auth/uri/uri_builder
+import gleam/bit_array
 
 /// Returns a MyApp record. This record is a convenient way to store your 
 /// application's Clio API credentials and will need to be passed to the api
@@ -240,4 +241,14 @@ pub fn fetch_all_pages(
     api_request_with_query,
     json_decoder,
   )
+}
+
+pub fn fetch_all_pages_raw(
+  my_app: MyApp,
+  token: ClioToken,
+  clio_api_url: String,
+  filters: Dict(String, String),
+  fields_to_return: String,
+) -> Result(ApiResponse(List(BitArray)), String) {
+  fetch_all_pages(my_app, token, clio_api_url, filters, fields_to_return, decode.bit_array)
 }

@@ -8,6 +8,10 @@ import glio
 import glio/api
 import glio/internal/api_pure
 
+import gleam/json
+import gleam/dynamic/decode
+import gleam/bit_array
+
 pub fn main() {
   gleeunit.main()
 }
@@ -43,7 +47,7 @@ pub fn build_api_query_test() {
     #("responsible_attorney_id", "1234"),
     #("status", "open,pending"),
   ]
-  let fields = ["id", "display_number", "description"]
+  let fields = "id,display_number,description"
   let req = api_pure.build_api_query(api_request, filters, fields)
   request.get_query(req)
   |> should.equal(
@@ -53,4 +57,26 @@ pub fn build_api_query_test() {
       #("fields", "id,display_number,description"),
     ]),
   )
+}
+
+pub fn decode_test() {
+  let my_json = "{\"meta\": {\"records\": 66}, \"data\": [\"This is some data!\"]}"
+  let my_string_decoder = decode.field("data", decode.list(decode.string), decode.success)
+  json.parse(my_json, my_string_decoder)
+  |> should.equal(Ok(["This is some data!"]))
+
+  let my_json = "{\"meta\": {\"records\": 66}, \"data\": [{\"id\": 25, \"statement\": \"This is some data!\"}]}"
+  let my_string_decoder = decode.field("data", decode.list(decode.field(
+      "statement", decode.string, decode.success)), decode.success)
+  json.parse(my_json, my_string_decoder)
+  |> should.equal(Ok(["This is some data!"]))
+
+  let my_json = "{\"name\": \"Bob\"}"
+  let my_name_decoder = decode.field("name", decode.string, decode.success)
+  json.parse(my_json, my_name_decoder)
+  |> should.equal(Ok("Bob"))
+
+  let my_bit_decoder = decode.field("name", decode.bit_array, decode.success)
+  json.parse(my_json, my_bit_decoder)
+  |> should.equal(Ok(bit_array.from_string("Bob")))
 }
