@@ -201,7 +201,7 @@ pub fn fetch_all_pages_from_clio_json(
   my_app: MyApp,
   clio_token: ClioToken,
   api_req_w_params: request.Request(String),
-) -> Result(ApiResponse(List(String)), String) {
+) -> Result(ApiResponse(List(Dynamic)), String) {
   make_recursive_paginated_request_json(
     my_app,
     clio_token,
@@ -219,10 +219,10 @@ fn make_recursive_paginated_request(
 ) -> Result(ApiResponse(List(a)), String) {
   case make_api_request(my_app, clio_token, api_req_w_params) {
     Ok(TokenNotRenewed(api_resp)) ->
-      parse_response(my_app, api_resp, json_decoder, accumulator, clio_token)
+      parse_clio_response(my_app, api_resp, json_decoder, accumulator, clio_token)
 
     Ok(TokenRenewed(api_resp, new_token)) ->
-      parse_response(
+      parse_clio_response(
         my_app,
         api_resp,
         json_decoder,
@@ -238,23 +238,23 @@ fn make_recursive_paginated_request_json(
   my_app: MyApp,
   clio_token: ClioToken,
   api_req_w_params: request.Request(String),
-  accumulator: ApiResponse(List(String)),
-) -> Result(ApiResponse(List(String)), String) {
+  accumulator: ApiResponse(List(Dynamic)),
+) -> Result(ApiResponse(List(Dynamic)), String) {
   case make_api_request(my_app, clio_token, api_req_w_params) {
     Ok(TokenNotRenewed(api_resp)) ->
-      parse_response(
+      parse_clio_response(
         my_app,
         api_resp,
-        decode.string,
+        decode.dynamic,
         accumulator,
         clio_token,
       )
 
     Ok(TokenRenewed(api_resp, new_token)) ->
-      parse_response(
+      parse_clio_response(
         my_app,
         api_resp,
-        decode.string,
+        decode.dynamic,
         TokenRenewed(accumulator.res, new_token),
         new_token,
       )
@@ -263,14 +263,14 @@ fn make_recursive_paginated_request_json(
   }
 }
 
-fn parse_response(
+fn parse_clio_response(
   my_app: MyApp,
   api_resp: response.Response(String),
   one_item_decoder: Decoder(a),
   accumulator: ApiResponse(List(a)),
   clio_token: ClioToken,
 ) -> Result(ApiResponse(List(a)), String) {
-  case json.decode(api_resp.body, run_decoder(_, one_item_decoder)) {
+  case json.decode(api_resp.body, decode_data_field_from_clio_response(_, one_item_decoder)) {
     Error(e) ->
       Error(
         "api_impure.parse_response(): Errors parsing response. "
@@ -302,7 +302,7 @@ fn parse_response(
   }
 }
 
-fn run_decoder(
+fn decode_data_field_from_clio_response(
   dyn: Dynamic,
   one_item_decoder: Decoder(a),
 ) -> Result(List(a), List(dynamic.DecodeError)) {
