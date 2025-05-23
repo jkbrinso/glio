@@ -242,13 +242,3 @@ pub fn fetch_all_pages(
     json_decoder,
   )
 }
-
-pub fn fetch_all_pages_raw(
-  my_app: MyApp,
-  token: ClioToken,
-  clio_api_url: String,
-  filters: Dict(String, String),
-  fields_to_return: String,
-) -> Result(ApiResponse(List(BitArray)), String) {
-  fetch_all_pages(my_app, token, clio_api_url, filters, fields_to_return, decode.bit_array)
-}
