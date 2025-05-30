@@ -21,6 +21,7 @@ import glow_auth
 import glow_auth/access_token as glow_access_token
 import glow_auth/token_request
 import glow_auth/uri/uri_builder
+import snag.{type Snag}
 
 pub fn fetch_glow_token_using_temporary_code(
   my_app: MyApp,
@@ -197,7 +198,6 @@ pub fn fetch_all_pages_from_clio(
   )
 }
 
-
 fn make_recursive_paginated_request(
   my_app: MyApp,
   clio_token: ClioToken,
@@ -209,7 +209,13 @@ fn make_recursive_paginated_request(
     Ok(TokenNotRenewed(api_resp)) -> {
       echo "GOT A PAGE FROM CLIO:"
       echo api_resp
-      parse_clio_response(my_app, api_resp, json_decoder, accumulator, clio_token)
+      parse_clio_response(
+        my_app,
+        api_resp,
+        json_decoder,
+        accumulator,
+        clio_token,
+      )
     }
 
     Ok(TokenRenewed(api_resp, new_token)) ->
@@ -231,11 +237,16 @@ fn parse_clio_response(
   one_item_decoder: Decoder(a),
   accumulator: ApiResponse(List(a)),
   clio_token: ClioToken,
-) -> Result(ApiResponse(List(a)), String) {
-  case json.decode(api_resp.body, decode_data_field_from_clio_response(_, one_item_decoder)) {
+) -> Result(ApiResponse(List(a)), Snag) {
+  case
+    json.decode(api_resp.body, decode_data_field_from_clio_response(
+      _,
+      one_item_decoder,
+    ))
+  {
     Error(e) ->
       Error(
-        "api_impure.parse_response(): Errors parsing response. "
+        ""
         <> " | ERRORS: "
         <> string.inspect(e)
         <> " | RESPONSE: "
