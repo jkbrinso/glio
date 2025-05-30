@@ -1,5 +1,6 @@
 import gleam/dict
-import gleam/dynamic.{type DecodeError, type Dynamic}
+import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode.{type DecodeError}
 import gleam/http/request.{type Request}
 import gleam/http/response
 import gleam/int
@@ -248,10 +249,6 @@ pub fn build_api_query(
       add_query_parameter(req, param.0, param.1)
     })
   let api_request_with_filters_and_fields =
-    add_query_parameter(
-      api_request_with_filters,
-      "fields",
-      fields_to_return,
-    )
+    add_query_parameter(api_request_with_filters, "fields", fields_to_return)
   api_request_with_filters_and_fields
 }

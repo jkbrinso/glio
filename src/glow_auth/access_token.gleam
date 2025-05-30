@@ -6,11 +6,12 @@
 //// ...the intention is to generate this from the response given when
 //// sending a token request.
 
-import gleam/dynamic.{type DecodeError, type Dynamic}
-import gleam/erlang.{Second}
+import gleam/dynamic/decode.{type Decoder}
+import gleam/float
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleam/string
+import gleam/time/timestamp
 
 /// Represents a token returned from an oauth2 provider
 ///
@@ -28,23 +29,39 @@ pub type AccessToken {
 
 /// Decode an access token
 /// TODO: Any other params are possible, so should be returned as a map.
-pub fn decoder() -> fn(Dynamic) -> Result(AccessToken, List(DecodeError)) {
-  dynamic.decode5(
-    from_decoded_response,
-    dynamic.field("access_token", of: dynamic.string),
-    dynamic.field("token_type", of: dynamic.string),
-    dynamic.optional_field("refresh_token", of: dynamic.string),
-    dynamic.optional_field("expires_in", of: dynamic.int),
-    dynamic.optional_field("scope", of: dynamic.string),
+pub fn decoder() -> Decoder(AccessToken) {
+  use access_token <- decode.field("access_token", decode.string)
+  use token_type <- decode.field("token_type", decode.string)
+  use refresh_token <- decode.optional_field(
+    "refresh_token",
+    None,
+    decode.optional(decode.string),
   )
+  use expires_in <- decode.optional_field(
+    "expires_in",
+    None,
+    decode.optional(decode.int),
+  )
+  use scope <- decode.optional_field(
+    "scope",
+    None,
+    decode.optional(decode.string),
+  )
+  decode.success(from_decoded_response(
+    access_token:,
+    token_type:,
+    refresh_token:,
+    expires_in:,
+    scope:,
+  ))
 }
 
 pub fn from_decoded_response(
-  access_token: String,
-  token_type: String,
-  refresh_token: Option(String),
-  expires_in: Option(Int),
-  scope: Option(String),
+  access_token access_token: String,
+  token_type token_type: String,
+  refresh_token refresh_token: Option(String),
+  expires_in expires_in: Option(Int),
+  scope scope: Option(String),
 ) -> AccessToken {
   AccessToken(
     access_token: access_token,
@@ -60,7 +77,7 @@ pub fn from_now(seconds: Int) -> Int {
 }
 
 pub fn decode_token_from_response(response: String) {
-  json.decode(response, using: decoder())
+  json.parse(response, using: decoder())
 }
 
 ///  Returns a new `AccessToken` given the access token `string`.
@@ -90,8 +107,7 @@ pub fn is_expired_at(access_token: AccessToken, at: Int) -> Bool {
 }
 
 pub fn time_now() -> Int {
-  // TODO: Use cross platform function for 'now'
-  erlang.system_time(Second)
+  timestamp.system_time() |> timestamp.to_unix_seconds |> float.truncate
 }
 
 pub fn normalize_token_type(token_type: String) -> String {
