@@ -60,7 +60,7 @@ pub fn get_user_id_from_api(
   let assert Ok(api_uri) =
     uri.parse("https://app.clio.com/api/v4/users/who_am_i.json")
   let assert Ok(user_id_request) = request.from_uri(api_uri)
-  let decode_body = json.decode(_, api_pure.clio_data_decoder(user_decoder()))
+  let body_decoder = json.parse(_, api_pure.clio_data_decoder(user_decoder()))
   case make_api_request(my_app, token_str, user_id_request) {
     Ok(TokenNotRenewed(user_id_response)) -> {
       case decode_body(user_id_response.body) {
@@ -237,13 +237,8 @@ fn parse_clio_response(
   one_item_decoder: Decoder(a),
   accumulator: ApiResponse(List(a)),
   clio_token: ClioToken,
-) -> Result(ApiResponse(List(a)), Snag) {
-  case
-    json.decode(api_resp.body, decode_data_field_from_clio_response(
-      _,
-      one_item_decoder,
-    ))
-  {
+) -> Result(ApiResponse(List(a)), String) {
+  case json.parse(api_resp.body, data_field_decoder(one_item_decoder)) {
     Error(e) ->
       Error(
         ""
@@ -275,22 +270,27 @@ fn parse_clio_response(
   }
 }
 
+fn data_field_decoder(inner_decoder: Decoder(a)) -> Decoder(a) {
+  let 
+  decode.field("data", decode.list(inner_decoder), decode.success)
+}
+
 fn decode_data_field_from_clio_response(
   dyn: Dynamic,
   one_item_decoder: Decoder(a),
-) -> Result(List(a), List(dynamic.DecodeError)) {
+) -> Result(List(a), List(decode.DecodeError)) {
   let decoder =
     decode.field("data", decode.list(one_item_decoder), decode.success)
   decode.run(dyn, decoder)
   |> result.map_error(map_decode_errors)
 }
 
-fn map_decode_errors(e: List(decode.DecodeError)) -> List(dynamic.DecodeError) {
+fn map_decode_errors(e: List(decode.DecodeError)) -> List(decode.DecodeError) {
   list.map(e, map_decode_error)
 }
 
-fn map_decode_error(e: decode.DecodeError) -> dynamic.DecodeError {
-  dynamic.DecodeError(e.expected, e.found, e.path)
+fn map_decode_error(e: decode.DecodeError) -> decode.DecodeError {
+  decode.DecodeError(e.expected, e.found, e.path)
 }
 
 fn accumulate_api_response(

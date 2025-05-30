@@ -1,10 +1,8 @@
 import gleam/dict
-import gleam/dynamic.{type Dynamic}
-import gleam/dynamic/decode.{type DecodeError}
+import gleam/dynamic/decode
 import gleam/http/request.{type Request}
 import gleam/http/response
 import gleam/int
-import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -28,7 +26,9 @@ pub fn add_query_parameter(
   |> fn(q) { request.set_query(outgoing_req, q) }
 }
 
-pub fn get_next_url(response_body: String) -> Result(Option(String), String) {
+pub fn get_next_url(
+  response_body: String,
+) -> Result(Option(String), json.DecodeError) {
   use pagination <- result.try(decode_pagination(response_body))
   case pagination.next {
     None -> Ok(None)
@@ -36,17 +36,14 @@ pub fn get_next_url(response_body: String) -> Result(Option(String), String) {
   }
 }
 
-pub fn get_previous_url(response_body: String) -> Result(String, String) {
+pub fn get_previous_url(
+  response_body: String,
+) -> Result(Option(String), json.DecodeError) {
   use pagination <- result.try(decode_pagination(response_body))
   case pagination.previous {
-    None -> Error("No previous page url received from Clio.")
-    Some(url) -> Ok(url)
+    None -> Ok(None)
+    Some(url) -> Ok(Some(url))
   }
-}
-
-/// Used to decode the clio json "data" field that wraps the data in api calls
-type ClioData(inner_type) {
-  ClioData(data: inner_type)
 }
 
 /// Most of the data that clio returns is wrapped in a "data" field. This
@@ -54,16 +51,10 @@ type ClioData(inner_type) {
 /// decoder around it. This is to avoid having to implement a separate decoder
 /// for each specific type of api call
 pub fn clio_data_decoder(
-  inner_decoder: fn(Dynamic) -> Result(inner_type, List(DecodeError)),
-) -> fn(Dynamic) -> Result(inner_type, List(DecodeError)) {
-  let outer_decoder =
-    dynamic.decode1(ClioData, dynamic.field("data", inner_decoder))
-  fn(d: Dynamic) {
-    case outer_decoder(d) {
-      Ok(clio_data) -> Ok(clio_data.data)
-      Error(e) -> Error(e)
-    }
-  }
+  inner_decoder: decode.Decoder(a),
+  next,
+) -> decode.Decoder(a) {
+  decode.field("data", inner_decoder, next)
 }
 
 pub fn convert_token_to_string(token: ClioToken) -> String {
@@ -137,45 +128,34 @@ pub fn url_to_request(url: String) -> Result(request.Request(String), String) {
   }
 }
 
-type ClioMeta {
-  ClioMeta(paging: ClioPaging)
-}
-
-type ClioPaging {
-  ClioPaging(urls: ClioPagesUrls)
-}
-
 pub type ClioPagesUrls {
   ClioPagesUrls(previous: Option(String), next: Option(String))
 }
 
-fn meta_decoder() -> fn(Dynamic) -> Result(ClioMeta, List(DecodeError)) {
-  dynamic.decode1(ClioMeta, dynamic.field("meta", paging_decoder()))
-}
-
-fn paging_decoder() -> fn(Dynamic) -> Result(ClioPaging, List(DecodeError)) {
-  dynamic.decode1(ClioPaging, dynamic.field("paging", pages_urls_decoder()))
-}
-
-fn pages_urls_decoder() -> fn(Dynamic) ->
-  Result(ClioPagesUrls, List(DecodeError)) {
-  dynamic.decode2(
-    ClioPagesUrls,
-    dynamic.optional_field("previous", dynamic.string),
-    dynamic.optional_field("next", dynamic.string),
+fn pages_urls_decoder() -> decode.Decoder(ClioPagesUrls) {
+  use previous <- decode.optional_field(
+    "previous",
+    None,
+    decode.optional(decode.string),
   )
+  use next <- decode.optional_field(
+    "next",
+    None,
+    decode.optional(decode.string),
+  )
+  decode.success(ClioPagesUrls(previous, next))
 }
 
-pub fn decode_pagination(json_data: String) -> Result(ClioPagesUrls, String) {
-  case json.decode(json_data, meta_decoder()) {
-    Ok(clio_meta) -> Ok(clio_meta.paging.urls)
-    Error(e) ->
-      Error(
-        "Unable to decode pagination information in Clio "
-        <> "response. More information: "
-        <> string.inspect(e),
-      )
-  }
+pub fn decode_pagination(
+  json_data: String,
+) -> Result(ClioPagesUrls, json.DecodeError) {
+  let paging_decoder =
+    decode.optionally_at(
+      ["meta", "paging"],
+      ClioPagesUrls(None, None),
+      pages_urls_decoder(),
+    )
+  json.parse(json_data, paging_decoder)
 }
 
 /// Given a Request req, returns the value of the query parameter "code"
