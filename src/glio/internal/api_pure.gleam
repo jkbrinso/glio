@@ -1,5 +1,6 @@
 import gleam/dict
 import gleam/dynamic/decode
+import gleam/dynamic.{type Dynamic}
 import gleam/http/request.{type Request}
 import gleam/http/response
 import gleam/int
@@ -14,6 +15,7 @@ import glow_auth
 import glow_auth/access_token as glow_access_token
 import glow_auth/token_request
 import glow_auth/uri/uri_builder
+import gleam/function
 
 /// Add a query parameter to a request string
 pub fn add_query_parameter(
@@ -28,7 +30,7 @@ pub fn add_query_parameter(
 
 pub fn get_next_url(
   response_body: String,
-) -> Result(Option(String), json.DecodeError) {
+) -> Result(Option(String), String) {
   use pagination <- result.try(decode_pagination(response_body))
   case pagination.next {
     None -> Ok(None)
@@ -38,7 +40,7 @@ pub fn get_next_url(
 
 pub fn get_previous_url(
   response_body: String,
-) -> Result(Option(String), json.DecodeError) {
+) -> Result(Option(String), String) {
   use pagination <- result.try(decode_pagination(response_body))
   case pagination.previous {
     None -> Ok(None)
@@ -52,9 +54,9 @@ pub fn get_previous_url(
 /// for each specific type of api call
 pub fn clio_data_decoder(
   inner_decoder: decode.Decoder(a),
-  next,
 ) -> decode.Decoder(a) {
-  decode.field("data", inner_decoder, next)
+  use val <- decode.field("data", inner_decoder)
+  decode.success(val)
 }
 
 pub fn convert_token_to_string(token: ClioToken) -> String {
@@ -148,7 +150,7 @@ fn pages_urls_decoder() -> decode.Decoder(ClioPagesUrls) {
 
 pub fn decode_pagination(
   json_data: String,
-) -> Result(ClioPagesUrls, json.DecodeError) {
+) -> Result(ClioPagesUrls, String) {
   let paging_decoder =
     decode.optionally_at(
       ["meta", "paging"],
@@ -156,6 +158,7 @@ pub fn decode_pagination(
       pages_urls_decoder(),
     )
   json.parse(json_data, paging_decoder)
+  |> result.map_error(fn(e) { string.inspect(e) })
 }
 
 /// Given a Request req, returns the value of the query parameter "code"

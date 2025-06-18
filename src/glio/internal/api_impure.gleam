@@ -44,12 +44,10 @@ type User {
   User(id: Int, name: String)
 }
 
-fn user_decoder() {
-  dynamic.decode2(
-    User,
-    dynamic.field("id", dynamic.int),
-    dynamic.field("name", dynamic.string),
-  )
+fn user_decoder() -> Decoder(User) {
+  use id <- decode.field("id", decode.int)
+  use name <- decode.field("name", decode.string)
+  decode.success(User(id, name))
 }
 
 pub fn get_user_id_from_api(
@@ -60,7 +58,8 @@ pub fn get_user_id_from_api(
   let assert Ok(api_uri) =
     uri.parse("https://app.clio.com/api/v4/users/who_am_i.json")
   let assert Ok(user_id_request) = request.from_uri(api_uri)
-  let body_decoder = json.parse(_, api_pure.clio_data_decoder(user_decoder()))
+  let body_decoder = api_pure.clio_data_decoder(user_decoder())
+  let decode_body = json.parse(_, body_decoder)
   case make_api_request(my_app, token_str, user_id_request) {
     Ok(TokenNotRenewed(user_id_response)) -> {
       case decode_body(user_id_response.body) {
@@ -270,8 +269,7 @@ fn parse_clio_response(
   }
 }
 
-fn data_field_decoder(inner_decoder: Decoder(a)) -> Decoder(a) {
-  let 
+fn data_field_decoder(inner_decoder: Decoder(a)) -> Decoder(List(a)) {
   decode.field("data", decode.list(inner_decoder), decode.success)
 }
 
