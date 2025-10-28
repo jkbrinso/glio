@@ -117,7 +117,7 @@ pub fn fetch_authorization_token(
 /// page requests in a more sophisticated way than fetch 
 ///
 /// Returns a tuple of the form:
-///    #(your json_decoder return value, previous_url, next_url)
+///    #(your_json_decoder_return value, previous_url, next_url)
 ///
 /// Otherwise, use fetch_yielder or fetch_all_pages
 pub fn fetch_one_previous_next(
