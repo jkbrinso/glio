@@ -149,9 +149,6 @@ fn refresh_token_then(
   my_app: MyApp,
   next: fn(ClioToken) -> Result(a, String),
 ) -> Result(a, String) {
-  io.println("glio/api_impure.refresh_token_then() called.")
-  io.println("TOKEN: " <> string.inspect(token))
-  io.println("MY_APP: " <> string.inspect(my_app))
   let assert Ok(clio_uri) = uri.parse("https://app.clio.com/oauth/token")
   let client = glow_auth.Client(my_app.id, my_app.secret, clio_uri)
   let req =
@@ -206,8 +203,6 @@ fn make_recursive_paginated_request(
 ) -> Result(ApiResponse(List(a)), String) {
   case make_api_request(my_app, clio_token, api_req_w_params) {
     Ok(TokenNotRenewed(api_resp)) -> {
-      echo "GOT A PAGE FROM CLIO:"
-      echo api_resp
       parse_clio_response(
         my_app,
         api_resp,
