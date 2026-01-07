@@ -3,7 +3,6 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode.{type Decoder}
 import gleam/http/request
 import gleam/http/response
-import gleam/httpc
 import gleam/int
 import gleam/io
 import gleam/json.{type Json}
@@ -21,8 +20,14 @@ import glow_auth
 import glow_auth/access_token as glow_access_token
 import glow_auth/token_request
 import glow_auth/uri/uri_builder
-import snag.{type Snag}
 
+@target(erlang)
+import gleam/httpc
+
+@target(javascript)
+import fetch
+
+@target(erlang)
 pub fn fetch_glow_token_using_temporary_code(
   my_app: MyApp,
   temporary_code: String,
@@ -30,6 +35,24 @@ pub fn fetch_glow_token_using_temporary_code(
   let oauth_token_request =
     api_pure.build_oauth_token_request(my_app, temporary_code)
   case httpc.send(oauth_token_request) {
+    Ok(resp) -> api_pure.decode_token_from_response(resp)
+    Error(e) ->
+      Error(
+        "Failed to receive a response from Clio when attempting "
+        <> "to get authorization token. More information: "
+        <> string.inspect(e),
+      )
+  }
+}
+
+@target(javascript)
+pub fn fetch_glow_token_using_temporary_code(
+  my_app: MyApp,
+  temporary_code: String,
+) -> Result(glow_access_token.AccessToken, String) {
+  let oauth_token_request =
+    api_pure.build_oauth_token_request(my_app, temporary_code)
+  case fetch.send(oauth_token_request) {
     Ok(resp) -> api_pure.decode_token_from_response(resp)
     Error(e) ->
       Error(
