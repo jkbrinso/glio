@@ -4,6 +4,7 @@ import gleam/dynamic/decode.{type Decoder}
 import gleam/http/request
 import gleam/http/response.{type Response}
 import gleam/int
+import gleam/javascript/promise
 import gleam/json.{type Json}
 import gleam/list
 import gleam/option.{None, Some}
@@ -309,5 +310,9 @@ fn send(req) -> Result(Response(String), String) {
 
 @target(javascript)
 fn send(req) -> Result(Response(String), String) {
-  fetch.send(req) |> result.map_error(string.inspect)
+  let res = {
+    use resp <- promise.try_await(fetch.send(req))
+    use body <- promise.await(fetch.read_text_body(resp))
+    promise.resolve(body)
+  }
 }
