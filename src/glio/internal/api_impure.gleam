@@ -2,9 +2,8 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode.{type Decoder}
 import gleam/http/request
-import gleam/http/response
+import gleam/http/response.{type Response}
 import gleam/int
-import gleam/io
 import gleam/json.{type Json}
 import gleam/list
 import gleam/option.{None, Some}
@@ -25,7 +24,7 @@ import glow_auth/uri/uri_builder
 import gleam/httpc
 
 @target(javascript)
-import fetch
+import gleam/fetch
 
 @target(erlang)
 pub fn fetch_glow_token_using_temporary_code(
@@ -34,25 +33,7 @@ pub fn fetch_glow_token_using_temporary_code(
 ) -> Result(glow_access_token.AccessToken, String) {
   let oauth_token_request =
     api_pure.build_oauth_token_request(my_app, temporary_code)
-  case httpc.send(oauth_token_request) {
-    Ok(resp) -> api_pure.decode_token_from_response(resp)
-    Error(e) ->
-      Error(
-        "Failed to receive a response from Clio when attempting "
-        <> "to get authorization token. More information: "
-        <> string.inspect(e),
-      )
-  }
-}
-
-@target(javascript)
-pub fn fetch_glow_token_using_temporary_code(
-  my_app: MyApp,
-  temporary_code: String,
-) -> Result(glow_access_token.AccessToken, String) {
-  let oauth_token_request =
-    api_pure.build_oauth_token_request(my_app, temporary_code)
-  case fetch.send(oauth_token_request) {
+  case send(oauth_token_request) {
     Ok(resp) -> api_pure.decode_token_from_response(resp)
     Error(e) ->
       Error(
@@ -144,8 +125,9 @@ pub fn make_api_request(
     _ -> {
       let request_with_authorization_header =
         glow_auth.authorization_header(outgoing_req, token.access_token)
+
       let api_response_result =
-        httpc.send(request_with_authorization_header)
+        send(request_with_authorization_header)
         |> result.map_error(fn(e) {
           "api.impure.make_api_request() Error in sending request to clio -> "
           <> string.inspect(e)
@@ -180,7 +162,7 @@ fn refresh_token_then(
       uri_builder.FullUri(clio_uri),
       token.refresh_token,
     )
-  let res = case httpc.send(req) {
+  let res = case send(req) {
     Ok(resp) -> api_pure.decode_token_from_response(resp)
     Error(e) ->
       Error(
@@ -318,4 +300,14 @@ fn accumulate_api_response(
     TokenNotRenewed(_) -> TokenNotRenewed(new_list)
     TokenRenewed(_, new_token) -> TokenRenewed(new_list, new_token)
   }
+}
+
+@target(erlang)
+fn send(req) -> Result(Response(String), String) {
+  httpc.send(req) |> result.map_error(string.inspect)
+}
+
+@target(javascript)
+fn send(req) -> Result(Response(String), String) {
+  fetch.send(req) |> result.map_error(string.inspect)
 }
