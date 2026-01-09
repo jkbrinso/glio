@@ -3,8 +3,8 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode.{type Decoder}
 import gleam/http/request
 import gleam/http/response.{type Response}
+import gleam/httpc
 import gleam/int
-import gleam/javascript/promise
 import gleam/json.{type Json}
 import gleam/list
 import gleam/option.{None, Some}
@@ -22,19 +22,13 @@ import glow_auth/token_request
 import glow_auth/uri/uri_builder
 
 @target(erlang)
-import gleam/httpc
-
-@target(javascript)
-import gleam/fetch
-
-@target(erlang)
 pub fn fetch_glow_token_using_temporary_code(
   my_app: MyApp,
   temporary_code: String,
 ) -> Result(glow_access_token.AccessToken, String) {
   let oauth_token_request =
     api_pure.build_oauth_token_request(my_app, temporary_code)
-  case send(oauth_token_request) {
+  case httpc.send(oauth_token_request) {
     Ok(resp) -> api_pure.decode_token_from_response(resp)
     Error(e) ->
       Error(
@@ -300,19 +294,5 @@ fn accumulate_api_response(
   case acc {
     TokenNotRenewed(_) -> TokenNotRenewed(new_list)
     TokenRenewed(_, new_token) -> TokenRenewed(new_list, new_token)
-  }
-}
-
-@target(erlang)
-fn send(req) -> Result(Response(String), String) {
-  httpc.send(req) |> result.map_error(string.inspect)
-}
-
-@target(javascript)
-fn send(req) -> Result(Response(String), String) {
-  let res = {
-    use resp <- promise.try_await(fetch.send(req))
-    use body <- promise.await(fetch.read_text_body(resp))
-    promise.resolve(body)
   }
 }
