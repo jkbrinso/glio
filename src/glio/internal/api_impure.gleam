@@ -122,7 +122,7 @@ pub fn make_api_request(
         glow_auth.authorization_header(outgoing_req, token.access_token)
 
       let api_response_result =
-        send(request_with_authorization_header)
+        httpc.send(request_with_authorization_header)
         |> result.map_error(fn(e) {
           "api.impure.make_api_request() Error in sending request to clio -> "
           <> string.inspect(e)
@@ -157,7 +157,7 @@ fn refresh_token_then(
       uri_builder.FullUri(clio_uri),
       token.refresh_token,
     )
-  let res = case send(req) {
+  let res = case httpc.send(req) {
     Ok(resp) -> api_pure.decode_token_from_response(resp)
     Error(e) ->
       Error(
