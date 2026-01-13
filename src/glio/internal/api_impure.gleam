@@ -21,7 +21,6 @@ import glow_auth/access_token as glow_access_token
 import glow_auth/token_request
 import glow_auth/uri/uri_builder
 
-@target(erlang)
 pub fn fetch_glow_token_using_temporary_code(
   my_app: MyApp,
   temporary_code: String,
